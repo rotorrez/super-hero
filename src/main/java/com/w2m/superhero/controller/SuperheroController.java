@@ -2,7 +2,6 @@ package com.w2m.superhero.controller;
 
 import com.w2m.superhero.domain.Superhero;
 import com.w2m.superhero.service.SuperheroService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
