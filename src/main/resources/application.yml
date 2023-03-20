@@ -1,0 +1,27 @@
+# Default properties file
+
+spring:
+  jpa:
+    show-sql: true
+    database-plattform: org.hibernate.dialect.H2Dialect
+    defer-datasource-initialization: true
+  h2:
+    console:
+      enabled: true
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /api-docs
+
+logging:
+  config: classpath:log4j.properties
+
+
+
