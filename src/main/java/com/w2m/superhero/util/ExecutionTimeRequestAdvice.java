@@ -20,7 +20,13 @@ public class ExecutionTimeRequestAdvice {
         Object object = point.proceed();
         long finish = System.nanoTime();
         long timeElapsed = finish - start;
-        logger.info("Time take by " + point.getSignature().getName() + "() method is " + TimeUnit.NANOSECONDS.toMillis(timeElapsed) + " ms");
+        logger.info(builderLogMessage(point.getSignature().getName(), TimeUnit.NANOSECONDS.toMillis(timeElapsed)));
         return object;
+    }
+
+    public String builderLogMessage(String name, Long timeElapsed) {
+        final StringBuilder builder = new StringBuilder()
+                .append("Time take by ").append(name).append("() method is ").append(timeElapsed).append(" ms");
+        return builder.toString();
     }
 }

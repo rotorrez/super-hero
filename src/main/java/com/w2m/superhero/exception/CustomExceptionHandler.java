@@ -35,6 +35,12 @@ public class CustomExceptionHandler {
         return new ResponseEntity(customErrorResponse, HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler(SuperheroExistsException.class)
+    public ResponseEntity<Object> handleExistsException(Exception ex, WebRequest request) {
+        CustomErrorResponse customErrorResponse = new CustomErrorResponse("SUPERHERO ALREADY EXISTS, TRY WITH ANOTHER PARAMETERS. THANKS: " + ex.getMessage(), request.getDescription(false), LocalDateTime.now());
+        return new ResponseEntity(customErrorResponse, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Object> handleInternalServerErrorException(Exception ex, WebRequest request) {
         CustomErrorResponse customErrorResponse = new CustomErrorResponse("OH NO! SOMETHING BAD HAPPENED, PLEASE COME BACK LATER OR TRY WITH ANOTHER DATA. THANKS: " + ex.getMessage(), request.getDescription(false), LocalDateTime.now());

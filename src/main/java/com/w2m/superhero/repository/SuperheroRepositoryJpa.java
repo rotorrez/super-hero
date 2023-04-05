@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface SuperheroRepositoryJpa extends JpaRepository<Superhero, Long> {
     List<Superhero> findByNameContainingIgnoreCase(String username);
+    Boolean existsSuperheroesByName(String name);
 }

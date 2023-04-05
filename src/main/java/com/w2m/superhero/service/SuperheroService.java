@@ -1,6 +1,7 @@
 package com.w2m.superhero.service;
 
 import com.w2m.superhero.domain.Superhero;
+import com.w2m.superhero.exception.SuperheroExistsException;
 import com.w2m.superhero.exception.SuperheroNotFoundException;
 import com.w2m.superhero.repository.SuperheroRepositoryJpa;
 import com.w2m.superhero.util.ExecutionTimeRequest;
@@ -30,6 +31,10 @@ public class SuperheroService {
 
     @ExecutionTimeRequest
     public Superhero saveSuperhero(Superhero superhero) {
+        if (superheroRepository.existsSuperheroesByName(superhero.getName())) {
+            throw new SuperheroExistsException("SuperHero with Name: " + superhero.getName() + " already exists");
+        }
+
         return superheroRepository.save(superhero);
     }
 

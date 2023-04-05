@@ -2,9 +2,10 @@ package com.w2m.superhero.unit.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.w2m.superhero.controller.SuperheroController;
-import com.w2m.superhero.repository.SuperheroRepositoryJpa;
 import com.w2m.superhero.domain.Superhero;
+import com.w2m.superhero.exception.SuperheroExistsException;
 import com.w2m.superhero.exception.SuperheroNotFoundException;
+import com.w2m.superhero.repository.SuperheroRepositoryJpa;
 import com.w2m.superhero.service.SuperheroService;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeAll;
@@ -173,4 +174,18 @@ public class SuperheroControllerTest {
         assertEquals(SuperheroNotFoundException.class, resultActions.andReturn().getResolvedException().getClass());
     }
 
+    @Test
+    public void testSaveSuperhero_WhenSuperheroNameExist_ShouldThrowSuperheroExistsException() throws Exception {
+        Superhero superhero = new Superhero(1L, "Batman");
+        superheroRepositoryJpa.save(superhero);
+
+        RequestBuilder requestBuilder = MockMvcRequestBuilders
+                .post(urlBase)
+                .content(asJsonString(superhero))
+                .contentType(MediaType.APPLICATION_JSON_VALUE);
+
+        ResultActions resultActions = mockMvc.perform(requestBuilder)
+                .andExpect(MockMvcResultMatchers.status().isBadRequest());
+        assertEquals(SuperheroExistsException.class, resultActions.andReturn().getResolvedException().getClass());
+    }
 }
