@@ -1,79 +1,135 @@
+
 package com.santander.san.audobs.sanaudobsbamoeeepplib.integration.service;
 
 import com.santander.san.audobs.sanaudobsbamoeeepplib.integration.model.event.EventDTO;
 import com.santander.san.audobs.sanaudobsbamoeeepplib.integration.utils.EventMapperUtils;
 import com.santander.sgt.apm1953.sgtapm1953ppectrl.service.impl.EngineControllerServiceImpl;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import io.quarkus.logging.Log;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
+import java.util.HashMap;
 import java.util.Map;
 
-@ApplicationScoped
-public class EventService {
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
 
-    private static final Integer DEFAULT_STATUS_ID = 8; // CTFO_E_08 si aplica constante
-    private static final Boolean DEFAULT_IS_FINAL = false;
+class EventServiceTest {
 
-    @Inject
+    @Mock
     EngineControllerServiceImpl engineControllerService;
 
-    public void updateStatusFromEvent(Map<String, Object> eventMap) {
-        Log.debugf("Received event map: %s", eventMap);
+    @InjectMocks
+    EventService eventService;
 
-        try {
-            EventDTO dto = EventMapperUtils.mapEventDTO(eventMap);
-            Log.debugf("Mapped EventDTO: %s", dto);
-
-            Map<String, Object> data = dto.getData();
-
-            String caseId = getRequiredString(data, "caseId");
-            String processId = getRequiredString(data, "processId");
-            String userId = getRequiredString(data, "userId");
-            String centerId = getRequiredString(data, "centerId");
-            String accessPointId = dto.getAccessPointId();
-
-            Integer stageId = null;
-            if (data.get("stageId") != null) {
-                try {
-                    stageId = Integer.parseInt(data.get("stageId").toString());
-                } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException("Invalid stageId format: " + data.get("stageId"), e);
-                }
-            }
-
-            Log.infof(
-                "Calling changeStatusOrStage with caseId=%s, processId=%s, statusId=%d, stageId=%s, userId=%s, centerId=%s, accessPointId=%s",
-                caseId, processId, DEFAULT_STATUS_ID, String.valueOf(stageId), userId, centerId, accessPointId
-            );
-
-            engineControllerService.changeStatusOrStage(
-                caseId,
-                processId,
-                DEFAULT_STATUS_ID,
-                stageId,
-                userId,
-                DEFAULT_IS_FINAL,
-                centerId,
-                accessPointId
-            );
-
-            Log.infof("Successfully updated status for caseId=%s in processId=%s", caseId, processId);
-
-        } catch (IllegalArgumentException e) {
-            Log.errorf(e, "Validation error while processing event: %s", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            Log.errorf(e, "Unexpected error while processing event: %s", e.getMessage());
-            throw new RuntimeException("Error while processing event", e);
-        }
+    @BeforeEach
+    void setup() {
+        MockitoAnnotations.openMocks(this);
     }
 
-    private String getRequiredString(Map<String, Object> data, String key) {
-        Object value = data.get(key);
-        if (value == null || value.toString().trim().isEmpty()) {
-            throw new IllegalArgumentException("Missing required field in event data: " + key);
-        }
-        return value.toString();
+    @Test
+    void shouldInvokeChangeStatusOrStage_whenInputIsValid() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("caseId", "CASE123");
+        data.put("processId", "PROC456");
+        data.put("userId", "user789");
+        data.put("centerId", "center001");
+        data.put("stageId", "10");
+
+        Map<String, Object> eventMap = new HashMap<>();
+        eventMap.put("action", "SOME_ACTION");
+        eventMap.put("data", data);
+        eventMap.put("accessPointId", "access-001");
+
+        EventDTO dto = EventDTO.builder()
+                .action("SOME_ACTION")
+                .data(data)
+                .accessPointId("access-001")
+                .build();
+
+        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
+
+        eventService.updateStatusFromEvent(eventMap);
+
+        verify(engineControllerService).changeStatusOrStage("CASE123", "PROC456", 8, 10, "user789", false, "center001", "access-001");
+    }
+
+    @Test
+    void shouldThrowException_whenMissingRequiredField() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("processId", "PROC456"); // caseId missing
+        data.put("userId", "user789");
+        data.put("centerId", "center001");
+
+        Map<String, Object> eventMap = new HashMap<>();
+        eventMap.put("action", "SOME_ACTION");
+        eventMap.put("data", data);
+        eventMap.put("accessPointId", "access-001");
+
+        EventDTO dto = EventDTO.builder()
+                .action("SOME_ACTION")
+                .data(data)
+                .accessPointId("access-001")
+                .build();
+
+        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
+
+        assertThrows(IllegalArgumentException.class, () -> eventService.updateStatusFromEvent(eventMap));
+    }
+
+    @Test
+    void shouldThrowException_whenStageIdIsInvalid() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("caseId", "CASE123");
+        data.put("processId", "PROC456");
+        data.put("userId", "user789");
+        data.put("centerId", "center001");
+        data.put("stageId", "invalid");
+
+        Map<String, Object> eventMap = new HashMap<>();
+        eventMap.put("action", "SOME_ACTION");
+        eventMap.put("data", data);
+        eventMap.put("accessPointId", "access-001");
+
+        EventDTO dto = EventDTO.builder()
+                .action("SOME_ACTION")
+                .data(data)
+                .accessPointId("access-001")
+                .build();
+
+        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
+
+        assertThrows(IllegalArgumentException.class, () -> eventService.updateStatusFromEvent(eventMap));
+    }
+
+    @Test
+    void shouldHandleUnexpectedExceptions() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("caseId", "CASE123");
+        data.put("processId", "PROC456");
+        data.put("userId", "user789");
+        data.put("centerId", "center001");
+        data.put("stageId", "10");
+
+        Map<String, Object> eventMap = new HashMap<>();
+        eventMap.put("action", "SOME_ACTION");
+        eventMap.put("data", data);
+        eventMap.put("accessPointId", "access-001");
+
+        EventDTO dto = EventDTO.builder()
+                .action("SOME_ACTION")
+                .data(data)
+                .accessPointId("access-001")
+                .build();
+
+        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
+        doThrow(new RuntimeException("DB failure")).when(engineControllerService).changeStatusOrStage(
+                any(), any(), any(), any(), any(), anyBoolean(), any(), any()
+        );
+
+        assertThrows(RuntimeException.class, () -> eventService.updateStatusFromEvent(eventMap));
     }
 }
