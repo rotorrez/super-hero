@@ -4,11 +4,11 @@ package com.santander.san.audobs.sanaudobsbamoeeepplib.integration.service;
 import com.santander.san.audobs.sanaudobsbamoeeepplib.integration.model.event.EventDTO;
 import com.santander.san.audobs.sanaudobsbamoeeepplib.integration.utils.EventMapperUtils;
 import com.santander.sgt.apm1953.sgtapm1953ppectrl.service.impl.EngineControllerServiceImpl;
-import io.quarkus.logging.Log;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 
 import java.util.HashMap;
@@ -50,11 +50,13 @@ class EventServiceTest {
                 .accessPointId("access-001")
                 .build();
 
-        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
+        try (MockedStatic<EventMapperUtils> mocked = mockStatic(EventMapperUtils.class)) {
+            mocked.when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
 
-        eventService.updateStatusFromEvent(eventMap);
+            eventService.updateStatusFromEvent(eventMap);
 
-        verify(engineControllerService).changeStatusOrStage("CASE123", "PROC456", 8, 10, "user789", false, "center001", "access-001");
+            verify(engineControllerService).changeStatusOrStage("CASE123", "PROC456", 8, 10, "user789", false, "center001", "access-001");
+        }
     }
 
     @Test
@@ -75,9 +77,11 @@ class EventServiceTest {
                 .accessPointId("access-001")
                 .build();
 
-        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
+        try (MockedStatic<EventMapperUtils> mocked = mockStatic(EventMapperUtils.class)) {
+            mocked.when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
 
-        assertThrows(IllegalArgumentException.class, () -> eventService.updateStatusFromEvent(eventMap));
+            assertThrows(IllegalArgumentException.class, () -> eventService.updateStatusFromEvent(eventMap));
+        }
     }
 
     @Test
@@ -100,9 +104,11 @@ class EventServiceTest {
                 .accessPointId("access-001")
                 .build();
 
-        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
+        try (MockedStatic<EventMapperUtils> mocked = mockStatic(EventMapperUtils.class)) {
+            mocked.when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
 
-        assertThrows(IllegalArgumentException.class, () -> eventService.updateStatusFromEvent(eventMap));
+            assertThrows(IllegalArgumentException.class, () -> eventService.updateStatusFromEvent(eventMap));
+        }
     }
 
     @Test
@@ -125,11 +131,14 @@ class EventServiceTest {
                 .accessPointId("access-001")
                 .build();
 
-        mockStatic(EventMapperUtils.class).when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
-        doThrow(new RuntimeException("DB failure")).when(engineControllerService).changeStatusOrStage(
-                any(), any(), any(), any(), any(), anyBoolean(), any(), any()
-        );
+        try (MockedStatic<EventMapperUtils> mocked = mockStatic(EventMapperUtils.class)) {
+            mocked.when(() -> EventMapperUtils.mapEventDTO(eventMap)).thenReturn(dto);
 
-        assertThrows(RuntimeException.class, () -> eventService.updateStatusFromEvent(eventMap));
+            doThrow(new RuntimeException("DB failure")).when(engineControllerService).changeStatusOrStage(
+                    any(), any(), any(), any(), any(), anyBoolean(), any(), any()
+            );
+
+            assertThrows(RuntimeException.class, () -> eventService.updateStatusFromEvent(eventMap));
+        }
     }
 }
