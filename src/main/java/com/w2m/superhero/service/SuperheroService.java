@@ -13,6 +13,7 @@ import java.util.Map;
 public class EventService {
 
     private static final Integer DEFAULT_STATUS_ID = 8; // CTFO_E_08 si aplica constante
+    private static final Boolean DEFAULT_IS_FINAL = false;
 
     @Inject
     EngineControllerServiceImpl engineControllerService;
@@ -29,6 +30,8 @@ public class EventService {
             String caseId = getRequiredString(data, "caseId");
             String processId = getRequiredString(data, "processId");
             String userId = getRequiredString(data, "userId");
+            String centerId = getRequiredString(data, "centerId");
+            String accessPointId = dto.getAccessPointId();
 
             Integer stageId = null;
             if (data.get("stageId") != null) {
@@ -39,10 +42,21 @@ public class EventService {
                 }
             }
 
-            Log.infof("Calling changeStatusAndStage with caseId=%s, processId=%s, statusId=%d, stageId=%s, userId=%s",
-                    caseId, processId, DEFAULT_STATUS_ID, String.valueOf(stageId), userId);
+            Log.infof(
+                "Calling changeStatusOrStage with caseId=%s, processId=%s, statusId=%d, stageId=%s, userId=%s, centerId=%s, accessPointId=%s",
+                caseId, processId, DEFAULT_STATUS_ID, String.valueOf(stageId), userId, centerId, accessPointId
+            );
 
-            engineControllerService.changeStatusAndStage(caseId, processId, DEFAULT_STATUS_ID, stageId, userId);
+            engineControllerService.changeStatusOrStage(
+                caseId,
+                processId,
+                DEFAULT_STATUS_ID,
+                stageId,
+                userId,
+                DEFAULT_IS_FINAL,
+                centerId,
+                accessPointId
+            );
 
             Log.infof("Successfully updated status for caseId=%s in processId=%s", caseId, processId);
 
