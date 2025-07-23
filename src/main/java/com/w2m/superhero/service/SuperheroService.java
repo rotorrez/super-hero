@@ -5,31 +5,24 @@ import com.santander.san.audobs.sanaudobsbamoeeepplib.integration.utils.EventMap
 import com.santander.sgt.apm1953.sgtapm1953ppectrl.service.impl.EngineControllerServiceImpl;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import lombok.extern.slf4j.Slf4j;
+import io.quarkus.logging.Log;
 
 import java.util.Map;
 
 @ApplicationScoped
-@Slf4j
 public class EventService {
 
-    private static final Integer DEFAULT_STATUS_ID = 8; // CTFO_E_08 (puedes sustituir por constante si la tienes)
+    private static final Integer DEFAULT_STATUS_ID = 8; // CTFO_E_08 si aplica constante
 
     @Inject
     EngineControllerServiceImpl engineControllerService;
 
-    /**
-     * Transforma un evento recibido como mapa en el DTO correspondiente y
-     * ejecuta el cambio de estado del caso asociado.
-     *
-     * @param eventMap mapa de información del evento (action, data, accessPointId, etc)
-     */
     public void updateStatusFromEvent(Map<String, Object> eventMap) {
-        log.debug("Received event map: {}", eventMap);
+        Log.debugf("Received event map: %s", eventMap);
 
         try {
             EventDTO dto = EventMapperUtils.mapEventDTO(eventMap);
-            log.debug("Mapped EventDTO: {}", dto);
+            Log.debugf("Mapped EventDTO: %s", dto);
 
             Map<String, Object> data = dto.getData();
 
@@ -46,25 +39,22 @@ public class EventService {
                 }
             }
 
-            log.info("Calling changeStatusAndStage with caseId={}, processId={}, statusId={}, stageId={}, userId={}",
-                    caseId, processId, DEFAULT_STATUS_ID, stageId, userId);
+            Log.infof("Calling changeStatusAndStage with caseId=%s, processId=%s, statusId=%d, stageId=%s, userId=%s",
+                    caseId, processId, DEFAULT_STATUS_ID, String.valueOf(stageId), userId);
 
             engineControllerService.changeStatusAndStage(caseId, processId, DEFAULT_STATUS_ID, stageId, userId);
 
-            log.info("Successfully updated status for caseId={} in processId={}", caseId, processId);
+            Log.infof("Successfully updated status for caseId=%s in processId=%s", caseId, processId);
 
         } catch (IllegalArgumentException e) {
-            log.error("Validation error while processing event: {}", e.getMessage(), e);
+            Log.errorf(e, "Validation error while processing event: %s", e.getMessage());
             throw e;
         } catch (Exception e) {
-            log.error("Unexpected error while processing event: {}", e.getMessage(), e);
+            Log.errorf(e, "Unexpected error while processing event: %s", e.getMessage());
             throw new RuntimeException("Error while processing event", e);
         }
     }
 
-    /**
-     * Extrae y valida un campo obligatorio de tipo String desde el mapa de datos.
-     */
     private String getRequiredString(Map<String, Object> data, String key) {
         Object value = data.get(key);
         if (value == null || value.toString().trim().isEmpty()) {
@@ -73,4 +63,3 @@ public class EventService {
         return value.toString();
     }
 }
-
