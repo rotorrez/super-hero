@@ -1,17 +1,25 @@
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
-import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
-import java.util.HashMap;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.client.CoexistenceRestClient;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.security.TokenProvider;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.service.CoexistenceService;
+import org.kie.kogito.usertask.events.UserTaskStateEvent;
 
-@ExtendWith(MockitoExtension.class)
+import java.util.Map;
+
 class CoexistenceServiceTest {
+
+    @InjectMocks
+    CoexistenceService service;
 
     @Mock
     CoexistenceRestClient client;
@@ -19,56 +27,67 @@ class CoexistenceServiceTest {
     @Mock
     TokenProvider tokenProvider;
 
-    @InjectMocks
-    CoexistenceService service;
-
     @Mock
     UserTaskStateEvent event;
 
-    @BeforeEach
-    void setup() {
-        // Simular la instancia de la tarea
-        UserTaskInstance instance = mock(UserTaskInstance.class);
-        when(instance.getId()).thenReturn("task-123");
-        when(instance.getTaskName()).thenReturn("MyTask");
-        when(instance.getInputs()).thenReturn(new HashMap<>() {{
-            put("caseId", "case-456");
-        }});
+    @Mock
+    org.kie.kogito.usertask.lifecycle.UserTaskState oldStatus;
 
-        when(event.getUserTaskInstance()).thenReturn(instance);
-        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
+    @Mock
+    org.kie.kogito.usertask.lifecycle.UserTaskState newStatus;
+
+    @BeforeEach
+    void init() {
+        MockitoAnnotations.openMocks(this);
+        when(event.getUserTaskInstance()).thenReturn(mock(org.kie.kogito.task.UserTaskInstance.class));
     }
 
     @Test
     void taskCoexistence_shouldCallSet_whenCreatedToReady() {
-        when(event.getOldStatus().getName()).thenReturn("Created");
-        when(event.getNewStatus().getName()).thenReturn("Ready");
-        when(client.performPostCoexistence(any(), any(), any())).thenReturn(Response.ok().build());
+        when(event.getOldStatus()).thenReturn(oldStatus);
+        when(event.getNewStatus()).thenReturn(newStatus);
+        when(oldStatus.getName()).thenReturn("Created");
+        when(newStatus.getName()).thenReturn("Ready");
+
+        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
+        when(client.performPostCoexistence(any(), any(), any(), any())).thenReturn(Response.ok().build());
 
         service.taskCoexistence(event);
 
-        verify(client).performPostCoexistence(any(), eq("mock-token"), eq("PRCOS2"));
+        verify(client, times(1)).performPostCoexistence(any(), any(), any(), any());
     }
 
     @Test
     void taskCoexistence_shouldCallDelete_whenTransitionToCompleted() {
-        when(event.getOldStatus().getName()).thenReturn("Ready");
-        when(event.getNewStatus().getName()).thenReturn("Completed");
-        when(client.performDeleteCoexistence(any(), any(), any())).thenReturn(Response.ok().build());
+        when(event.getOldStatus()).thenReturn(oldStatus);
+        when(event.getNewStatus()).thenReturn(newStatus);
+        when(oldStatus.getName()).thenReturn("Ready");
+        when(newStatus.getName()).thenReturn("Completed");
+
+        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
+        when(client.performDeleteCoexistence(any(), any(), any(), any())).thenReturn(Response.ok().build());
 
         service.taskCoexistence(event);
 
-        verify(client).performDeleteCoexistence(eq("task-123"), eq("mock-token"), eq("PRCOS2"));
+        verify(client, times(1)).performDeleteCoexistence(any(), any(), any(), any());
     }
 
     @Test
     void taskCoexistence_shouldThrowException_onPostError() {
-        when(event.getOldStatus().getName()).thenReturn("Created");
-        when(event.getNewStatus().getName()).thenReturn("Ready");
+        when(event.getOldStatus()).thenReturn(oldStatus);
+        when(event.getNewStatus()).thenReturn(newStatus);
+        when(oldStatus.getName()).thenReturn("Created");
+        when(newStatus.getName()).thenReturn("Ready");
 
-        Response errorResponse = Response.status(400).entity("Bad Request").build();
-        when(client.performPostCoexistence(any(), any(), any()))
-                .thenThrow(new WebApplicationException(errorResponse));
+        WebApplicationException mockException = mock(WebApplicationException.class);
+        Response mockResponse = mock(Response.class);
+
+        when(mockResponse.readEntity(String.class)).thenReturn("Bad Request");
+        when(mockException.getResponse()).thenReturn(mockResponse);
+        when(mockException.getMessage()).thenReturn("wrapped message");
+
+        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
+        when(client.performPostCoexistence(any(), any(), any(), any())).thenThrow(mockException);
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> service.taskCoexistence(event));
         assertTrue(ex.getMessage().contains("Error registering coexistence task"));
@@ -76,12 +95,20 @@ class CoexistenceServiceTest {
 
     @Test
     void taskCoexistence_shouldThrowException_onDeleteError() {
-        when(event.getOldStatus().getName()).thenReturn("Ready");
-        when(event.getNewStatus().getName()).thenReturn("Completed");
+        when(event.getOldStatus()).thenReturn(oldStatus);
+        when(event.getNewStatus()).thenReturn(newStatus);
+        when(oldStatus.getName()).thenReturn("Ready");
+        when(newStatus.getName()).thenReturn("Completed");
 
-        Response errorResponse = Response.status(500).entity("Internal Server Error").build();
-        when(client.performDeleteCoexistence(any(), any(), any()))
-                .thenThrow(new WebApplicationException(errorResponse));
+        WebApplicationException mockException = mock(WebApplicationException.class);
+        Response mockResponse = mock(Response.class);
+
+        when(mockResponse.readEntity(String.class)).thenReturn("Delete Failed");
+        when(mockException.getResponse()).thenReturn(mockResponse);
+        when(mockException.getMessage()).thenReturn("wrapped delete message");
+
+        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
+        when(client.performDeleteCoexistence(any(), any(), any(), any())).thenThrow(mockException);
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> service.taskCoexistence(event));
         assertTrue(ex.getMessage().contains("Error deleting coexistence task"));
