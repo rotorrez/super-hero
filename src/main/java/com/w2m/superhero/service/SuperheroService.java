@@ -1,45 +1,42 @@
-@ExtendWith(MockitoExtension.class)
-class AppianRestClientTest {
+package com.tuempresa.tuproyecto.client;
 
-    @Mock
-    AppianRestClient appianRestClient;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
-    @Test
-    void shouldCallTriggerEventSuccessfully() {
-        // Arrange
-        String caseNumber = "CASE123";
-        String event = "START";
-        String sessionId = UUID.randomUUID().toString();
-        String clientId = "clientIdTest";
-        String channel = "INT";
+import com.tuempresa.tuproyecto.dto.CoexistenceTaskDTO;
+import com.tuempresa.tuproyecto.dto.CaseRelationDTO;
 
-        AppianEventPayloadDTO payload = AppianEventPayloadDTO.builder()
-            .processCode("PROC001")
-            .customersIdentification(List.of("123456"))
-            .contactPoint(new AppianContactPointDTO("POINT001"))
-            .specificInformation("Some info")
-            .build();
+import java.util.Map;
 
-        AppianEventResponseDTO expectedResponse = AppianEventResponseDTO.builder()
-            .status("200 OK")
-            .message("Triggered")
-            .build();
+@RegisterRestClient(configKey = "coexistence-api-client")
+@Path("/")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public interface CoexistenceRestClient {
 
-        when(appianRestClient.triggerEvent(
-                eq(caseNumber), eq(event), eq(payload),
-                eq(sessionId), eq(clientId), eq(channel)
-        )).thenReturn(expectedResponse);
+    @POST
+    @Path("task")
+    Response performPostCoexistence(
+        CoexistenceTaskDTO dto,
+        @HeaderParam("Authorization") String bearerToken,
+        @HeaderParam("X-ClientId") String clientId
+    );
 
-        // Act
-        AppianEventResponseDTO actualResponse = appianRestClient.triggerEvent(
-            caseNumber, event, payload, sessionId, clientId, channel
-        );
+    @DELETE
+    @Path("tasks/{taskId}")
+    Response performDeleteCoexistence(
+        @PathParam("taskId") String taskId,
+        @HeaderParam("Authorization") String bearerToken,
+        @HeaderParam("X-ClientId") String clientId
+    );
 
-        // Assert
-        assertNotNull(actualResponse);
-        assertEquals("200 OK", actualResponse.getStatus());
-        assertEquals("Triggered", actualResponse.getMessage());
-
-        verify(appianRestClient).triggerEvent(any(), any(), any(), any(), any(), any());
-    }
+    @GET
+    @Path("caseRelations/ppaasCase/{caseId}")
+    CaseRelationDTO performGetCoexistence(
+        @PathParam("caseId") String caseId,
+        @HeaderParam("Authorization") String bearerToken,
+        @HeaderParam("X-ClientId") String clientId
+    );
 }
