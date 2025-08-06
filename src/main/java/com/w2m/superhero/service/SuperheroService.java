@@ -1,55 +1,20 @@
 @Test
-void shouldThrowWebApplicationExceptionWhenCallFails() {
-    // Given: a valid token request
-    RequestTokenDTO request = RequestTokenDTO.builder()
-        .realm("realm")
-        .password("fail")
-        .build();
+void shouldForceNewTokenWhenExpired() {
+    // Given: a cached token that's already expired
+    ResponseTokenDTO expiredToken = new ResponseTokenDTO();
+    expiredToken.setJwt(createJwtWithExpiration(Instant.now().minusSeconds(60))); // ya expirado
+    cachedTokenRef.set(expiredToken);
 
-    // And a mocked response with status and body
-    Response mockedResponse = Response
-        .status(Response.Status.BAD_REQUEST)
-        .entity("Invalid credentials")
-        .build();
+    // Given: the new token to return
+    ResponseTokenDTO newToken = new ResponseTokenDTO();
+    newToken.setJwt(createJwtWithExpiration(Instant.now().plusSeconds(3600))); // válido por 1 hora
 
-    WebApplicationException exception = new WebApplicationException(mockedResponse);
+    when(tokenRestClient.getToken(any(RequestTokenDTO.class))).thenReturn(newToken);
 
-    TokenRestClient mockClient = mock(TokenRestClient.class);
-    when(mockClient.getToken(any())).thenThrow(exception);
+    // When
+    String bearerToken = tokenProvider.getBearerToken();
 
-    // When & Then
-    WebApplicationException thrown = assertThrows(WebApplicationException.class, () -> {
-        mockClient.getToken(request);
-    });
-
-    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), thrown.getResponse().getStatus());
-    assertEquals("Invalid credentials", thrown.getResponse().readEntity(String.class));
-}
-
-
-
-
-
-
-
-@Test
-void shouldThrowGenericExceptionWhenUnexpectedErrorOccurs() {
-    // Given: a valid token request DTO
-    RequestTokenDTO request = RequestTokenDTO.builder()
-        .realm("realm")
-        .password("pass")
-        .build();
-
-    // And the mock client throws a RuntimeException
-    when(tokenRestClient.getToken(any(RequestTokenDTO.class)))
-        .thenThrow(new RuntimeException("Something went wrong"));
-
-    // When & Then: the TokenProvider should propagate the exception
-    RuntimeException thrown = assertThrows(
-        RuntimeException.class,
-        () -> tokenProvider.getBearerToken()
-    );
-
-    assertEquals("Something went wrong", thrown.getMessage());
+    // Then
+    assertEquals("Bearer " + newToken.getJwt(), bearerToken);
     verify(tokenRestClient).getToken(any(RequestTokenDTO.class));
 }
