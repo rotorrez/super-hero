@@ -1,72 +1,106 @@
-package com.tu.paquete.client;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-import com.tu.paquete.dto.CoexistenceTaskDTO;
-import com.tu.paquete.dto.CaseRelationDTO;
-import jakarta.ws.rs.core.Response;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventPayloadDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventRequestDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventResponseDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.AppianRestClient;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.service.AppianEventService;
+
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-class CoexistenceRestClientTest {
+@QuarkusTest
+class AppianEventServiceTest {
 
     @Mock
-    CoexistenceRestClient client;
+    AppianRestClient appianRestClient;
+
+    @InjectMocks
+    AppianEventService appianEventService;
+
+    private final String sessionId = "test-session";
+    private final String clientId = "test-client";
+    private final String channel = "test-channel";
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+
+        // Inyectar config properties manualmente si es necesario
+        appianEventService.sessionId = sessionId;
+        appianEventService.clientId = clientId;
+        appianEventService.channel = channel;
     }
 
     @Test
-    void testPerformPostCoexistence_success() {
-        CoexistenceTaskDTO dto = new CoexistenceTaskDTO();
-        dto.setTaskId("T123");
-        dto.setCaseId("C456");
-        dto.setTaskName("SampleTask");
+    void triggerEvent_successfulResponse() {
+        // Given
+        AppianEventRequestDTO request = new AppianEventRequestDTO();
+        request.setIdCaso(1);
+        request.setEvent("APPROVED");
+        request.setProcessCode("P1");
+        request.setCustomersIdentification("12345678A");
+        request.setIdAccessPoint(99);
 
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
+        AppianEventPayloadDTO payload = AppianEventPayloadDTO.builder()
+                .processCode("P1")
+                .customersIdentification("12345678A")
+                .contactPoint(null)
+                .specificInformation(null)
+                .build();
 
-        when(client.performPostCoexistence(eq(dto), anyString(), anyString()))
-            .thenReturn(mockResponse);
+        AppianEventResponseDTO expectedResponse = new AppianEventResponseDTO();
+        expectedResponse.setStatus("OK");
 
-        Response response = client.performPostCoexistence(dto, "Bearer xyz", "PRCOS2");
+        when(appianRestClient.triggerEvent(
+                eq("000001"), // caseNumber simulado desde getCaseNumberByIdCaso()
+                eq("APPROVED"),
+                any(AppianEventPayloadDTO.class),
+                eq(sessionId),
+                eq(clientId),
+                eq(channel))
+        ).thenReturn(expectedResponse);
 
-        assertNotNull(response);
-        assertEquals(200, response.getStatus());
-        verify(client).performPostCoexistence(dto, "Bearer xyz", "PRCOS2");
+        // Mock del método interno getCaseNumberByIdCaso()
+        AppianEventService spyService = spy(appianEventService);
+        doReturn("000001").when(spyService).getCaseNumberByIdCaso(1);
+        doReturn(null).when(spyService).getContactPointById(99);
+
+        // When
+        AppianEventResponseDTO actual = spyService.triggerEvent(request);
+
+        // Then
+        assertNotNull(actual);
+        assertEquals("OK", actual.getStatus());
     }
 
     @Test
-    void testPerformDeleteCoexistence_success() {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(204);
+    void triggerEvent_clientThrowsException() {
+        AppianEventRequestDTO request = new AppianEventRequestDTO();
+        request.setIdCaso(1);
+        request.setEvent("REJECTED");
+        request.setProcessCode("P2");
+        request.setCustomersIdentification("99999999Z");
+        request.setIdAccessPoint(55);
 
-        when(client.performDeleteCoexistence(eq("T123"), anyString(), anyString()))
-            .thenReturn(mockResponse);
+        when(appianRestClient.triggerEvent(
+                any(), any(), any(), any(), any(), any())
+        ).thenThrow(new RuntimeException("Unexpected error"));
 
-        Response response = client.performDeleteCoexistence("T123", "Bearer xyz", "PRCOS2");
+        AppianEventService spyService = spy(appianEventService);
+        doReturn("999999").when(spyService).getCaseNumberByIdCaso(1);
+        doReturn(null).when(spyService).getContactPointById(55);
 
-        assertNotNull(response);
-        assertEquals(204, response.getStatus());
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> {
+            spyService.triggerEvent(request);
+        });
+
+        assertTrue(ex.getMessage().contains("Unexpected error"));
     }
-
-    @Test
-    void testPerformGetCoexistence_success() {
-        CaseRelationDTO mockDto = new CaseRelationDTO();
-        mockDto.setCaseId("C456");
-
-        when(client.performGetCoexistence(eq("C456"), anyString(), anyString()))
-            .thenReturn(mockDto);
-
-        CaseRelationDTO result = client.performGetCoexistence("C456", "Bearer xyz", "PRCOS2");
-
-        assertNotNull(result);
-        assertEquals("C456", result.getCaseId());
-    }
-}
+} 
