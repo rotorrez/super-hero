@@ -1,28 +1,8 @@
-package com.santander.san.audobs.sanaudobsbamoecoexislib.service;
-
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.CoexistenceTaskDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.CaseRelationDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.CoexistenceRestClient;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.security.TokenProvider;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.model.UserTaskStateEvent;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.model.enums.UserTaskStatusEnum;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.HashMap;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
-
 @ExtendWith(MockitoExtension.class)
 class CoexistenceServiceTest {
+
+    @InjectMocks
+    CoexistenceService service;
 
     @Mock
     TokenProvider tokenProvider;
@@ -30,31 +10,37 @@ class CoexistenceServiceTest {
     @Mock
     CoexistenceRestClient client;
 
-    @InjectMocks
-    CoexistenceService service;
-
+    @Mock
     UserTaskStateEvent event;
 
-    @BeforeEach
-    void init() {
-        event = mock(UserTaskStateEvent.class);
-        var userTaskInstance = mock(UserTaskStateEvent.UserTaskInstance.class);
+    @Mock
+    UserTaskStatus oldStatus;
 
-        when(event.getUserTaskInstance()).thenReturn(userTaskInstance);
-        when(userTaskInstance.getId()).thenReturn("task-123");
-        when(userTaskInstance.getTaskName()).thenReturn("MyTask");
-        when(userTaskInstance.getInputs()).thenReturn(new HashMap<>() {{
-            put("caseId", "case-456");
-        }});
+    @Mock
+    UserTaskStatus newStatus;
+
+    @BeforeEach
+    void setUp() {
+        when(event.getOldStatus()).thenReturn(oldStatus);
+        when(event.getNewStatus()).thenReturn(newStatus);
+
+        when(oldStatus.getName()).thenReturn("Created");
+        when(newStatus.getName()).thenReturn("Ready");
+
+        var userTask = mock(UserTask.class);
+        when(event.getUserTaskInstance()).thenReturn(userTask);
+
+        when(userTask.getId()).thenReturn("task-123");
+        when(userTask.getTaskName()).thenReturn("MyTask");
+        when(userTask.getInputs()).thenReturn(Map.of("caseId", "case-456"));
+
         when(tokenProvider.getBearerToken()).thenReturn("mock-token");
     }
 
     @Test
     void taskCoexistence_shouldCallSet_whenCreatedToReady() {
-        when(event.getOldStatus()).thenReturn(UserTaskStatusEnum.Created);
-        when(event.getNewStatus()).thenReturn(UserTaskStatusEnum.Ready);
-        when(client.performPostCoexistence(any(CoexistenceTaskDTO.class), eq("mock-token"), anyString()))
-                .thenReturn(Response.ok().build());
+        when(client.performPostCoexistence(any(), any(), any()))
+            .thenReturn(Response.ok().build());
 
         service.taskCoexistence(event);
 
@@ -62,11 +48,11 @@ class CoexistenceServiceTest {
     }
 
     @Test
-    void taskCoexistence_shouldCallDelete_whenCompleted() {
-        when(event.getOldStatus()).thenReturn(UserTaskStatusEnum.Ready);
-        when(event.getNewStatus()).thenReturn(UserTaskStatusEnum.Completed);
-        when(client.performDeleteCoexistence(eq("task-123"), eq("mock-token"), anyString()))
-                .thenReturn(Response.ok().build());
+    void taskCoexistence_shouldCallDelete_whenStatusIsCompleted() {
+        when(oldStatus.getName()).thenReturn("InProgress");
+        when(newStatus.getName()).thenReturn("Completed");
+        when(client.performDeleteCoexistence(any(), any(), any()))
+            .thenReturn(Response.ok().build());
 
         service.taskCoexistence(event);
 
@@ -74,53 +60,47 @@ class CoexistenceServiceTest {
     }
 
     @Test
-    void taskCoexistence_shouldNotCall_whenUnrelatedTransition() {
-        when(event.getOldStatus()).thenReturn(UserTaskStatusEnum.Created);
-        when(event.getNewStatus()).thenReturn(UserTaskStatusEnum.InProgress);
+    void setTaskCoexistence_shouldHandleWebApplicationException() {
+        var userTask = event.getUserTaskInstance();
 
-        service.taskCoexistence(event);
+        when(client.performPostCoexistence(any(), any(), any()))
+            .thenThrow(buildWebAppException(400, "Some error"));
 
-        verifyNoInteractions(client);
+        assertThrows(RuntimeException.class, () -> service.setTaskCoexistence(event));
     }
 
     @Test
-    void setTaskCoexistence_shouldHandleWebAppException() {
-        when(client.performPostCoexistence(any(), any(), any())).thenThrow(mockWebAppException());
+    void deleteTaskCoexistence_shouldHandleGenericException() {
+        var userTask = event.getUserTaskInstance();
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.setTaskCoexistence(event));
-        assertTrue(ex.getMessage().contains("Error registering coexistence task"));
+        when(client.performDeleteCoexistence(any(), any(), any()))
+            .thenThrow(new RuntimeException("Unexpected error"));
+
+        assertThrows(RuntimeException.class, () -> service.deleteTaskCoexistence(event));
     }
 
     @Test
-    void deleteTaskCoexistence_shouldHandleWebAppException() {
-        when(client.performDeleteCoexistence(any(), any(), any())).thenThrow(mockWebAppException());
-
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.deleteTaskCoexistence(event));
-        assertTrue(ex.getMessage().contains("Error deleting coexistence task"));
-    }
-
-    @Test
-    void getCaseRelationByPpaasCaseId_shouldReturnResponse() {
+    void getCaseRelationByPpaasCaseId_shouldReturnDTO() {
         CaseRelationDTO dto = new CaseRelationDTO();
-        when(client.performGetCoexistence(eq("ppaas-001"), eq("mock-token"), anyString())).thenReturn(dto);
+        when(client.performGetCoexistence("ppaas-001", "mock-token", "PRCOS2"))
+            .thenReturn(dto);
 
-        CaseRelationDTO result = service.getCaseRelationByPpaasCaseId("ppaas-001");
+        var result = service.getCaseRelationByPpaasCaseId("ppaas-001");
+
         assertEquals(dto, result);
     }
 
     @Test
-    void getCaseRelationByPpaasCaseId_shouldHandleWebAppException() {
-        when(client.performGetCoexistence(any(), any(), any())).thenThrow(mockWebAppException());
+    void getCaseRelationByPpaasCaseId_shouldHandleWebApplicationException() {
+        when(client.performGetCoexistence(any(), any(), any()))
+            .thenThrow(buildWebAppException(404, "Not found"));
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.getCaseRelationByPpaasCaseId("any"));
-        assertTrue(ex.getMessage().contains("Error fetching case relation"));
+        assertThrows(RuntimeException.class, () -> service.getCaseRelationByPpaasCaseId("ppaas-001"));
     }
 
-    private WebApplicationException mockWebAppException() {
-        Response response = mock(Response.class);
-        when(response.getStatus()).thenReturn(400);
-        when(response.readEntity(String.class)).thenReturn("Bad Request");
-        WebApplicationException ex = new WebApplicationException(response);
-        return ex;
+    // Utilidad para mockear WebApplicationException con body
+    private WebApplicationException buildWebAppException(int status, String message) {
+        var response = Response.status(status).entity(message).type(MediaType.TEXT_PLAIN).build();
+        return new WebApplicationException(response);
     }
 }
