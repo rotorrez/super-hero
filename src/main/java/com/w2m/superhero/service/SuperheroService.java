@@ -1,117 +1,72 @@
-package com.tu.paquete;
+package com.tu.paquete.client;
 
-import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.WebApplicationException;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import com.tu.paquete.dto.*;
-import com.tu.paquete.client.CoexistenceRestClient;
-import com.tu.paquete.security.TokenProvider;
+import com.tu.paquete.dto.CoexistenceTaskDTO;
+import com.tu.paquete.dto.CaseRelationDTO;
+import jakarta.ws.rs.core.Response;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
-@ApplicationScoped
-public class CoexistenceService {
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-    @Inject
-    TokenProvider tokenProvider;
+class CoexistenceRestClientTest {
 
-    @Inject
+    @Mock
     CoexistenceRestClient client;
 
-    @ConfigProperty(name = "bamoecoexis.coexistence.client-id", defaultValue = "PRCOS2")
-    String clientId;
-
-    public void taskCoexistence(UserTaskStateEvent event) {
-        String oldStatusName = event.getOldStatus().getName();
-        String newStatusName = event.getNewStatus().getName();
-
-        UserTaskStatusEnum oldStatus = UserTaskStatusEnum.fromString(oldStatusName);
-        UserTaskStatusEnum newStatus = UserTaskStatusEnum.fromString(newStatusName);
-
-        String taskId = event.getUserTaskInstance().getId();
-        String taskName = event.getUserTaskInstance().getTaskName();
-
-        Log.infof("Evaluating task state change: TaskName=%s, TaskId=%s, Transition=%s -> %s", taskName, taskId, oldStatusName, newStatusName);
-
-        if (oldStatus == UserTaskStatusEnum.Created && newStatus == UserTaskStatusEnum.Ready) {
-            Log.infof("Triggering coexistence set for TaskId=%s", taskId);
-            setTaskCoexistence(event);
-        } else if (newStatus == UserTaskStatusEnum.Completed) {
-            Log.infof("Triggering coexistence delete for TaskId=%s", taskId);
-            deleteTaskCoexistence(event);
-        } else {
-            Log.debugf("No action taken for state change: %s -> %s", oldStatusName, newStatusName);
-        }
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
     }
 
-    public void setTaskCoexistence(UserTaskStateEvent event) {
-        try {
-            String taskName = event.getUserTaskInstance().getTaskName();
-            String taskId = event.getUserTaskInstance().getId();
-            String caseId = (String) event.getUserTaskInstance().getInputs().get("caseId");
+    @Test
+    void testPerformPostCoexistence_success() {
+        CoexistenceTaskDTO dto = new CoexistenceTaskDTO();
+        dto.setTaskId("T123");
+        dto.setCaseId("C456");
+        dto.setTaskName("SampleTask");
 
-            Log.infof("Registering coexistence task: CaseId=%s, TaskName=%s, TaskId=%s", caseId, taskName, taskId);
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
 
-            CoexistenceTaskDTO dto = new CoexistenceTaskDTO();
-            dto.setCaseId(caseId);
-            dto.setTaskName(taskName);
-            dto.setTaskId(taskId);
+        when(client.performPostCoexistence(eq(dto), anyString(), anyString()))
+            .thenReturn(mockResponse);
 
-            String token = tokenProvider.getBearerToken();
-            var response = client.performPostCoexistence(dto, token, clientId);
+        Response response = client.performPostCoexistence(dto, "Bearer xyz", "PRCOS2");
 
-            Log.infof("Task registered successfully in coexistence system. TaskId=%s, Status=%s", taskId, response.getStatus());
-
-        } catch (WebApplicationException ex) {
-            String body = ex.getResponse().readEntity(String.class);
-            Log.errorf("Error from coexistence system (POST). Status=%s, Body=%s", ex.getResponse().getStatus(), body);
-            throw new RuntimeException("Error registering coexistence task: " + body, ex);
-        } catch (Exception ex) {
-            Log.error("Unexpected error in setTaskCoexistence", ex);
-            throw new RuntimeException("Unexpected error registering coexistence task", ex);
-        }
+        assertNotNull(response);
+        assertEquals(200, response.getStatus());
+        verify(client).performPostCoexistence(dto, "Bearer xyz", "PRCOS2");
     }
 
-    public void deleteTaskCoexistence(UserTaskStateEvent event) {
-        try {
-            String taskId = event.getUserTaskInstance().getId();
-            String token = tokenProvider.getBearerToken();
+    @Test
+    void testPerformDeleteCoexistence_success() {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(204);
 
-            Log.infof("Deleting coexistence task: TaskId=%s", taskId);
+        when(client.performDeleteCoexistence(eq("T123"), anyString(), anyString()))
+            .thenReturn(mockResponse);
 
-            var response = client.performDeleteCoexistence(taskId, token, clientId);
+        Response response = client.performDeleteCoexistence("T123", "Bearer xyz", "PRCOS2");
 
-            Log.infof("Task deleted from coexistence system. TaskId=%s, Status=%s", taskId, response.getStatus());
-
-        } catch (WebApplicationException ex) {
-            String body = ex.getResponse().readEntity(String.class);
-            Log.errorf("Error from coexistence system (DELETE). Status=%s, Body=%s", ex.getResponse().getStatus(), body);
-            throw new RuntimeException("Error deleting coexistence task: " + body, ex);
-        } catch (Exception ex) {
-            Log.error("Unexpected error in deleteTaskCoexistence", ex);
-            throw new RuntimeException("Unexpected error deleting coexistence task", ex);
-        }
+        assertNotNull(response);
+        assertEquals(204, response.getStatus());
     }
 
-    public CaseRelationDTO getCaseRelationByPpaasCaseId(String ppaasCaseId) {
-        try {
-            String token = tokenProvider.getBearerToken();
+    @Test
+    void testPerformGetCoexistence_success() {
+        CaseRelationDTO mockDto = new CaseRelationDTO();
+        mockDto.setCaseId("C456");
 
-            Log.infof("Fetching case relation for PPAAS case ID: %s", ppaasCaseId);
+        when(client.performGetCoexistence(eq("C456"), anyString(), anyString()))
+            .thenReturn(mockDto);
 
-            CaseRelationDTO response = client.performGetCoexistence(ppaasCaseId, token, clientId);
+        CaseRelationDTO result = client.performGetCoexistence("C456", "Bearer xyz", "PRCOS2");
 
-            Log.infof("Received case relation for PPAAS case ID: %s -> %s", ppaasCaseId, response);
-
-            return response;
-
-        } catch (WebApplicationException ex) {
-            String body = ex.getResponse().readEntity(String.class);
-            Log.errorf("Error from coexistence system (GET). Status=%s, Body=%s", ex.getResponse().getStatus(), body);
-            throw new RuntimeException("Error fetching case relation: " + body, ex);
-        } catch (Exception ex) {
-            Log.error("Unexpected error in getCaseRelationByPpaasCaseId", ex);
-            throw new RuntimeException("Unexpected error fetching case relation", ex);
-        }
+        assertNotNull(result);
+        assertEquals("C456", result.getCaseId());
     }
 }
