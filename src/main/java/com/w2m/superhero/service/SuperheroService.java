@@ -1,13 +1,25 @@
-@QuarkusTest
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
+
+import java.util.HashMap;
+
+@ExtendWith(MockitoExtension.class)
 class CoexistenceServiceTest {
 
-    @InjectMock
+    @Mock
     CoexistenceRestClient client;
 
-    @InjectMock
+    @Mock
     TokenProvider tokenProvider;
 
-    @Inject
+    @InjectMocks
     CoexistenceService service;
 
     @Mock
@@ -15,7 +27,7 @@ class CoexistenceServiceTest {
 
     @BeforeEach
     void setup() {
-        // Mock UserTaskInstance
+        // Simular la instancia de la tarea
         UserTaskInstance instance = mock(UserTaskInstance.class);
         when(instance.getId()).thenReturn("task-123");
         when(instance.getTaskName()).thenReturn("MyTask");
@@ -23,7 +35,6 @@ class CoexistenceServiceTest {
             put("caseId", "case-456");
         }});
 
-        // Mock Event
         when(event.getUserTaskInstance()).thenReturn(instance);
         when(tokenProvider.getBearerToken()).thenReturn("mock-token");
     }
@@ -32,8 +43,7 @@ class CoexistenceServiceTest {
     void taskCoexistence_shouldCallSet_whenCreatedToReady() {
         when(event.getOldStatus().getName()).thenReturn("Created");
         when(event.getNewStatus().getName()).thenReturn("Ready");
-        when(client.performPostCoexistence(any(), any(), any()))
-                .thenReturn(Response.ok().build());
+        when(client.performPostCoexistence(any(), any(), any())).thenReturn(Response.ok().build());
 
         service.taskCoexistence(event);
 
@@ -44,8 +54,7 @@ class CoexistenceServiceTest {
     void taskCoexistence_shouldCallDelete_whenTransitionToCompleted() {
         when(event.getOldStatus().getName()).thenReturn("Ready");
         when(event.getNewStatus().getName()).thenReturn("Completed");
-        when(client.performDeleteCoexistence(any(), any(), any()))
-                .thenReturn(Response.ok().build());
+        when(client.performDeleteCoexistence(any(), any(), any())).thenReturn(Response.ok().build());
 
         service.taskCoexistence(event);
 
@@ -53,26 +62,26 @@ class CoexistenceServiceTest {
     }
 
     @Test
-    void setTaskCoexistence_shouldThrowRuntimeException_whenWebApplicationException() {
+    void taskCoexistence_shouldThrowException_onPostError() {
         when(event.getOldStatus().getName()).thenReturn("Created");
         when(event.getNewStatus().getName()).thenReturn("Ready");
 
-        Response response = Response.status(400).entity("Bad Request").build();
+        Response errorResponse = Response.status(400).entity("Bad Request").build();
         when(client.performPostCoexistence(any(), any(), any()))
-                .thenThrow(new WebApplicationException(response));
+                .thenThrow(new WebApplicationException(errorResponse));
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> service.taskCoexistence(event));
         assertTrue(ex.getMessage().contains("Error registering coexistence task"));
     }
 
     @Test
-    void deleteTaskCoexistence_shouldThrowRuntimeException_whenWebApplicationException() {
+    void taskCoexistence_shouldThrowException_onDeleteError() {
         when(event.getOldStatus().getName()).thenReturn("Ready");
         when(event.getNewStatus().getName()).thenReturn("Completed");
 
-        Response response = Response.status(404).entity("Not Found").build();
+        Response errorResponse = Response.status(500).entity("Internal Server Error").build();
         when(client.performDeleteCoexistence(any(), any(), any()))
-                .thenThrow(new WebApplicationException(response));
+                .thenThrow(new WebApplicationException(errorResponse));
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> service.taskCoexistence(event));
         assertTrue(ex.getMessage().contains("Error deleting coexistence task"));
