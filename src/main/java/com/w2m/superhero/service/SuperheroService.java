@@ -8,6 +8,9 @@ class AppianEventServiceTest {
     AppianRestClient restClient;
 
     @Mock
+    TokenProvider tokenProvider;
+
+    @Mock
     @ConfigProperty(name = "appian-api.client-id")
     String clientId = "dummy-client-id";
 
@@ -15,44 +18,41 @@ class AppianEventServiceTest {
     @ConfigProperty(name = "appian-api.channel")
     String channel = "dummy-channel";
 
-    @Mock
-    TokenProvider tokenProvider;
-
     @Test
     void testTriggerEvent_Successful() {
         // Arrange
-        String caseNumber = "123";
-        String event = "start";
-        String bearerToken = "Bearer abc";
-
-        AppianEventPayloadDTO payload = AppianEventPayloadDTO.builder()
-            .processCode("PROC-01")
-            .customersIdentification(List.of("CUST-01"))
-            .contactPoint(new AppianContactPointDTO())
+        AppianEventRequestDTO request = AppianEventRequestDTO.builder()
+            .idCaso(123)
+            .event("start")
+            .processCode("P-001")
+            .customersIdentification(List.of("ABC123"))
+            .idAccessPoint(9)
             .specificInformation(null)
             .build();
 
+        String bearerToken = "Bearer mock-token";
+
         AppianEventResponseDTO expectedResponse = AppianEventResponseDTO.builder()
             .status("OK")
-            .message("Event triggered")
+            .message("Triggered")
             .build();
 
         when(tokenProvider.getBearerToken()).thenReturn(bearerToken);
         when(restClient.triggerEvent(
-                eq(caseNumber),
-                eq(event),
-                eq(payload),
-                eq("Bearer abc"),
+                eq(request.getIdCaso().toString()),
+                eq(request.getEvent()),
+                any(AppianEventPayloadDTO.class),
+                eq(bearerToken),
                 eq(clientId),
                 eq(channel)
         )).thenReturn(expectedResponse);
 
         // Act
-        AppianEventResponseDTO result = service.triggerEvent(caseNumber, event, payload);
+        AppianEventResponseDTO result = service.triggerEvent(request);
 
         // Assert
         assertNotNull(result);
         assertEquals("OK", result.getStatus());
-        assertEquals("Event triggered", result.getMessage());
+        assertEquals("Triggered", result.getMessage());
     }
 }
