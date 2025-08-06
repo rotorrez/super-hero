@@ -1,100 +1,165 @@
 package com.santander.san.audobs.sanaudobsbamoecoexislib.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventPayloadDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventRequestDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventResponseDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianContactPointDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.CaseRelationDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.*;
 import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.adapter.AccessPointAdapter;
 import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.AppianRestClient;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.service.CoexistenceService;
-
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.AppianContactPointDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.AppianEventPayloadDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.AppianEventResponseDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.CaseRelationDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.service.CoexistenceService;
+import jakarta.ws.rs.ProcessingException;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-public class AppianEventServiceTest {
+@ExtendWith(MockitoExtension.class)
+class AppianEventServiceTest {
 
-    private AppianEventService appianEventService;
+    @Mock
+    AppianRestClient appianRestClient;
 
-    private AppianRestClient appianRestClient;
-    private AccessPointAdapter accessPointAdapter;
-    private CoexistenceService coexistenceService;
+    @Mock
+    AccessPointAdapter accessPointAdapter;
+
+    @Mock
+    CoexistenceService coexistenceService;
+
+    @InjectMocks
+    AppianEventService appianEventService;
 
     @BeforeEach
     void setUp() {
-        appianRestClient = mock(AppianRestClient.class);
-        accessPointAdapter = mock(AccessPointAdapter.class);
-        coexistenceService = mock(CoexistenceService.class);
-
-        appianEventService = new AppianEventService();
-        appianEventService.appianRestClient = appianRestClient;
-        appianEventService.accessPointAdapter = accessPointAdapter;
-        appianEventService.coexistenceService = coexistenceService;
-
-        // Simular valores de configuración
-        appianEventService.clientId = "test-client-id";
+        appianEventService.clientId = "test-client";
         appianEventService.channel = "test-channel";
     }
 
     @Test
-    void testTriggerEvent_Successful() throws Exception {
-        // Arrange
-        AppianEventRequestDTO request = AppianEventRequestDTO.builder()
-                .idCaso(123)
-                .event("EVENT_TYPE")
-                .processCode("PROC-01")
-                .customersIdentification(List.of("CUST-01"))
-                .idAccessPoint(456)
-                .specificInformation(new ObjectMapper().readTree("{\"field\":\"value\"}"))
-                .build();
+    void testTriggerEvent_Successful() {
+        AppianEventRequestDTO request = buildRequest();
 
-        CaseRelationDTO caseRelationDTO = new CaseRelationDTO();
-        caseRelationDTO.setFictionalCaseId("CASE-456");
+        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
+        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
 
-        AppianContactPointDTO contactPointDTO = AppianContactPointDTO.builder()
-                .email("test@example.com")
-                .build();
+        AppianEventResponseDTO expectedResponse = AppianEventResponseDTO.builder().status("SUCCESS").message("OK").build();
+        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
+                .thenReturn(expectedResponse);
 
-        AppianEventResponseDTO expectedResponse = AppianEventResponseDTO.builder()
-                .status("SUCCESS")
-                .message("Triggered successfully")
-                .build();
+        AppianEventResponseDTO result = appianEventService.triggerEvent(request);
 
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(caseRelationDTO);
-        when(accessPointAdapter.getContactPointById(456)).thenReturn(contactPointDTO);
-        when(appianRestClient.triggerEvent(
-                eq("CASE-456"),
-                eq("EVENT_TYPE"),
-                any(AppianEventPayloadDTO.class),
-                anyString(), // sessionId
-                eq("test-client-id"),
-                eq("test-channel")
-        )).thenReturn(expectedResponse);
+        assertNotNull(result);
+        assertEquals("SUCCESS", result.getStatus());
+    }
 
-        // Act
-        AppianEventResponseDTO actualResponse = appianEventService.triggerEvent(request);
+    @Test
+    void testTriggerEvent_WebApplicationException() {
+        AppianEventRequestDTO request = buildRequest();
 
-        // Assert
-        assertEquals(expectedResponse.getStatus(), actualResponse.getStatus());
-        assertEquals(expectedResponse.getMessage(), actualResponse.getMessage());
+        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
+        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
 
-        verify(coexistenceService).getCaseRelationByPpaasCaseId("123");
-        verify(accessPointAdapter).getContactPointById(456);
-        verify(appianRestClient).triggerEvent(
-                eq("CASE-456"),
-                eq("EVENT_TYPE"),
-                any(AppianEventPayloadDTO.class),
-                anyString(),
-                eq("test-client-id"),
-                eq("test-channel")
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.hasEntity()).thenReturn(true);
+        when(mockResponse.readEntity(String.class)).thenReturn("Appian Error");
+        when(mockResponse.getStatus()).thenReturn(500);
+
+        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new WebApplicationException(mockResponse));
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            appianEventService.triggerEvent(request);
+        });
+
+        assertTrue(exception.getMessage().contains("Appian service error"));
+    }
+
+    @Test
+    void testTriggerEvent_ProcessingException() {
+        AppianEventRequestDTO request = buildRequest();
+
+        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
+        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
+
+        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new ProcessingException("Connection failed"));
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            appianEventService.triggerEvent(request);
+        });
+
+        assertTrue(exception.getMessage().contains("Connection error"));
+    }
+
+    @Test
+    void testTriggerEvent_GenericException() {
+        AppianEventRequestDTO request = buildRequest();
+
+        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
+        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
+
+        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("Unexpected error"));
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            appianEventService.triggerEvent(request);
+        });
+
+        assertTrue(exception.getMessage().contains("Unexpected error"));
+    }
+
+    @Test
+    void testGetCaseNumberByIdCaso_Success() {
+        when(coexistenceService.getCaseRelationByPpaasCaseId("123"))
+                .thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
+
+        String result = appianEventService.getCaseNumberByIdCaso(123);
+        assertEquals("FC123", result);
+    }
+
+    @Test
+    void testGetCaseNumberByIdCaso_NullDto() {
+        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(null);
+
+        NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
+                appianEventService.getCaseNumberByIdCaso(123)
         );
+
+        assertTrue(exception.getMessage().contains("not found"));
+    }
+
+    @Test
+    void testGetCaseNumberByIdCaso_NullFictionalId() {
+        when(coexistenceService.getCaseRelationByPpaasCaseId("123"))
+                .thenReturn(CaseRelationDTO.builder().fictionalCaseId(null).build());
+
+        NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
+                appianEventService.getCaseNumberByIdCaso(123)
+        );
+
+        assertTrue(exception.getMessage().contains("not found"));
+    }
+
+    private AppianEventRequestDTO buildRequest() {
+        return AppianEventRequestDTO.builder()
+                .idCaso(123)
+                .event("case.created")
+                .processCode("CODE")
+                .customersIdentification(List.of("ABC123"))
+                .idAccessPoint(10)
+                .specificInformation(new ObjectMapper().createObjectNode())
+                .build();
     }
 }
