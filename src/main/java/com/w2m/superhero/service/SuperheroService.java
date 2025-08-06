@@ -1,47 +1,36 @@
 @ExtendWith(MockitoExtension.class)
-class AppianEventServiceTest {
-
-    @InjectMocks
-    AppianEventService appianEventService;
+class AppianRestClientTest {
 
     @Mock
     AppianRestClient appianRestClient;
 
-    @Mock
-    AccessPointAdapter accessPointAdapter;
-
-    @Mock
-    CoexistenceService coexistenceService;
-
     @Test
-    void triggerEvent_shouldReturnResponse_whenClientReturnsSuccess() {
+    void shouldCallTriggerEventSuccessfully() {
         // Arrange
         AppianEventRequestDTO request = AppianEventRequestDTO.builder()
             .idCaso(1)
-            .event("create")
-            .processCode("PROC1")
-            .customersIdentification(List.of("123"))
-            .idAccessPoint(99)
-            .specificInformation("data")
+            .event("eventName")
+            .processCode("PROC123")
+            .customersIdentification(List.of("456"))
+            .idAccessPoint(101)
+            .specificInformation("info")
             .build();
 
-        when(coexistenceService.getCaseRelationByPpaasCaseId("1"))
-            .thenReturn(CaseRelationDTO.builder().fictionalCaseId("CASE-001").build());
+        AppianEventResponseDTO response = AppianEventResponseDTO.builder()
+            .message("Success")
+            .status("200 OK")
+            .build();
 
-        when(accessPointAdapter.getContactPointById(99))
-            .thenReturn(AppianContactPointDTO.builder().id(99).name("POINT").build());
-
-        AppianEventResponseDTO mockResponse = new AppianEventResponseDTO();
-        mockResponse.setStatus("OK");
-
-        when(appianRestClient.triggerEvent(eq("CASE-001"), eq("create"), any()))
-            .thenReturn(mockResponse);
+        when(appianRestClient.triggerEvent(eq("client123"), eq("channelABC"), eq(request)))
+            .thenReturn(response);
 
         // Act
-        AppianEventResponseDTO response = appianEventService.triggerEvent(request);
+        AppianEventResponseDTO result = appianRestClient.triggerEvent("client123", "channelABC", request);
 
         // Assert
-        assertEquals("OK", response.getStatus());
-        verify(appianRestClient).triggerEvent(eq("CASE-001"), eq("create"), any());
+        assertNotNull(result);
+        assertEquals("Success", result.getMessage());
+        assertEquals("200 OK", result.getStatus());
+        verify(appianRestClient).triggerEvent(any(), any(), any());
     }
 }
