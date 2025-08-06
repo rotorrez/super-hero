@@ -1,15 +1,11 @@
 package com.santander.san.audobs.sanaudobsbamoecoexislib.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.*;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.adapter.AccessPointAdapter;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.AppianRestClient;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.AppianContactPointDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.AppianEventPayloadDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.AppianEventResponseDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.dto.CaseRelationDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.service.CoexistenceService;
-import jakarta.ws.rs.ProcessingException;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.CoexistenceTaskDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.CaseRelationDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.CoexistenceRestClient;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.security.TokenProvider;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.model.UserTaskStateEvent;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.model.enums.UserTaskStatusEnum;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,147 +15,112 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.UUID;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
-class AppianEventServiceTest {
+class CoexistenceServiceTest {
 
     @Mock
-    AppianRestClient appianRestClient;
+    TokenProvider tokenProvider;
 
     @Mock
-    AccessPointAdapter accessPointAdapter;
-
-    @Mock
-    CoexistenceService coexistenceService;
+    CoexistenceRestClient client;
 
     @InjectMocks
-    AppianEventService appianEventService;
+    CoexistenceService service;
+
+    UserTaskStateEvent event;
 
     @BeforeEach
-    void setUp() {
-        appianEventService.clientId = "test-client";
-        appianEventService.channel = "test-channel";
+    void init() {
+        event = mock(UserTaskStateEvent.class);
+        var userTaskInstance = mock(UserTaskStateEvent.UserTaskInstance.class);
+
+        when(event.getUserTaskInstance()).thenReturn(userTaskInstance);
+        when(userTaskInstance.getId()).thenReturn("task-123");
+        when(userTaskInstance.getTaskName()).thenReturn("MyTask");
+        when(userTaskInstance.getInputs()).thenReturn(new HashMap<>() {{
+            put("caseId", "case-456");
+        }});
+        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
     }
 
     @Test
-    void testTriggerEvent_Successful() {
-        AppianEventRequestDTO request = buildRequest();
+    void taskCoexistence_shouldCallSet_whenCreatedToReady() {
+        when(event.getOldStatus()).thenReturn(UserTaskStatusEnum.Created);
+        when(event.getNewStatus()).thenReturn(UserTaskStatusEnum.Ready);
+        when(client.performPostCoexistence(any(CoexistenceTaskDTO.class), eq("mock-token"), anyString()))
+                .thenReturn(Response.ok().build());
 
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
-        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
+        service.taskCoexistence(event);
 
-        AppianEventResponseDTO expectedResponse = AppianEventResponseDTO.builder().status("SUCCESS").message("OK").build();
-        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
-                .thenReturn(expectedResponse);
-
-        AppianEventResponseDTO result = appianEventService.triggerEvent(request);
-
-        assertNotNull(result);
-        assertEquals("SUCCESS", result.getStatus());
+        verify(client, times(1)).performPostCoexistence(any(), any(), any());
     }
 
     @Test
-    void testTriggerEvent_WebApplicationException() {
-        AppianEventRequestDTO request = buildRequest();
+    void taskCoexistence_shouldCallDelete_whenCompleted() {
+        when(event.getOldStatus()).thenReturn(UserTaskStatusEnum.Ready);
+        when(event.getNewStatus()).thenReturn(UserTaskStatusEnum.Completed);
+        when(client.performDeleteCoexistence(eq("task-123"), eq("mock-token"), anyString()))
+                .thenReturn(Response.ok().build());
 
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
-        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
+        service.taskCoexistence(event);
 
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.hasEntity()).thenReturn(true);
-        when(mockResponse.readEntity(String.class)).thenReturn("Appian Error");
-        when(mockResponse.getStatus()).thenReturn(500);
-
-        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
-                .thenThrow(new WebApplicationException(mockResponse));
-
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            appianEventService.triggerEvent(request);
-        });
-
-        assertTrue(exception.getMessage().contains("Appian service error"));
+        verify(client, times(1)).performDeleteCoexistence(any(), any(), any());
     }
 
     @Test
-    void testTriggerEvent_ProcessingException() {
-        AppianEventRequestDTO request = buildRequest();
+    void taskCoexistence_shouldNotCall_whenUnrelatedTransition() {
+        when(event.getOldStatus()).thenReturn(UserTaskStatusEnum.Created);
+        when(event.getNewStatus()).thenReturn(UserTaskStatusEnum.InProgress);
 
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
-        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
+        service.taskCoexistence(event);
 
-        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
-                .thenThrow(new ProcessingException("Connection failed"));
-
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            appianEventService.triggerEvent(request);
-        });
-
-        assertTrue(exception.getMessage().contains("Connection error"));
+        verifyNoInteractions(client);
     }
 
     @Test
-    void testTriggerEvent_GenericException() {
-        AppianEventRequestDTO request = buildRequest();
+    void setTaskCoexistence_shouldHandleWebAppException() {
+        when(client.performPostCoexistence(any(), any(), any())).thenThrow(mockWebAppException());
 
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
-        when(accessPointAdapter.getContactPointById(10)).thenReturn(AppianContactPointDTO.builder().email("test@email.com").build());
-
-        when(appianRestClient.triggerEvent(any(), any(), any(), any(), any(), any()))
-                .thenThrow(new RuntimeException("Unexpected error"));
-
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            appianEventService.triggerEvent(request);
-        });
-
-        assertTrue(exception.getMessage().contains("Unexpected error"));
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.setTaskCoexistence(event));
+        assertTrue(ex.getMessage().contains("Error registering coexistence task"));
     }
 
     @Test
-    void testGetCaseNumberByIdCaso_Success() {
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123"))
-                .thenReturn(CaseRelationDTO.builder().fictionalCaseId("FC123").build());
+    void deleteTaskCoexistence_shouldHandleWebAppException() {
+        when(client.performDeleteCoexistence(any(), any(), any())).thenThrow(mockWebAppException());
 
-        String result = appianEventService.getCaseNumberByIdCaso(123);
-        assertEquals("FC123", result);
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.deleteTaskCoexistence(event));
+        assertTrue(ex.getMessage().contains("Error deleting coexistence task"));
     }
 
     @Test
-    void testGetCaseNumberByIdCaso_NullDto() {
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123")).thenReturn(null);
+    void getCaseRelationByPpaasCaseId_shouldReturnResponse() {
+        CaseRelationDTO dto = new CaseRelationDTO();
+        when(client.performGetCoexistence(eq("ppaas-001"), eq("mock-token"), anyString())).thenReturn(dto);
 
-        NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
-                appianEventService.getCaseNumberByIdCaso(123)
-        );
-
-        assertTrue(exception.getMessage().contains("not found"));
+        CaseRelationDTO result = service.getCaseRelationByPpaasCaseId("ppaas-001");
+        assertEquals(dto, result);
     }
 
     @Test
-    void testGetCaseNumberByIdCaso_NullFictionalId() {
-        when(coexistenceService.getCaseRelationByPpaasCaseId("123"))
-                .thenReturn(CaseRelationDTO.builder().fictionalCaseId(null).build());
+    void getCaseRelationByPpaasCaseId_shouldHandleWebAppException() {
+        when(client.performGetCoexistence(any(), any(), any())).thenThrow(mockWebAppException());
 
-        NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
-                appianEventService.getCaseNumberByIdCaso(123)
-        );
-
-        assertTrue(exception.getMessage().contains("not found"));
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.getCaseRelationByPpaasCaseId("any"));
+        assertTrue(ex.getMessage().contains("Error fetching case relation"));
     }
 
-    private AppianEventRequestDTO buildRequest() {
-        return AppianEventRequestDTO.builder()
-                .idCaso(123)
-                .event("case.created")
-                .processCode("CODE")
-                .customersIdentification(List.of("ABC123"))
-                .idAccessPoint(10)
-                .specificInformation(new ObjectMapper().createObjectNode())
-                .build();
+    private WebApplicationException mockWebAppException() {
+        Response response = mock(Response.class);
+        when(response.getStatus()).thenReturn(400);
+        when(response.readEntity(String.class)).thenReturn("Bad Request");
+        WebApplicationException ex = new WebApplicationException(response);
+        return ex;
     }
 }
