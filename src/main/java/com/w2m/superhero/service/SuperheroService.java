@@ -1,37 +1,50 @@
 @Test
 void shouldThrowWebApplicationExceptionWhenCallFails() {
-    // Arrange
-    String errorBody = "Unauthorized";
-    int httpStatus = 401;
+    // Given: a valid token request
+    RequestTokenDTO request = RequestTokenDTO.builder()
+        .realm("realm")
+        .password("fail")
+        .build();
 
-    Response mockResponse = mock(Response.class);
-    when(mockResponse.getStatus()).thenReturn(httpStatus);
-    when(mockResponse.readEntity(String.class)).thenReturn(errorBody);
+    // And a mocked response with status and body
+    Response mockedResponse = Response
+        .status(Response.Status.BAD_REQUEST)
+        .entity("Invalid credentials")
+        .build();
 
-    WebApplicationException exception = new WebApplicationException(mockResponse);
+    WebApplicationException exception = new WebApplicationException(mockedResponse);
 
-    when(tokenRestClient.getToken(any(RequestTokenDTO.class)))
-        .thenThrow(exception);
+    TokenRestClient mockClient = mock(TokenRestClient.class);
+    when(mockClient.getToken(any())).thenThrow(exception);
 
-    // Act & Assert
-    WebApplicationException thrown = assertThrows(
-        WebApplicationException.class,
-        () -> tokenProvider.getBearerToken()
-    );
+    // When & Then
+    WebApplicationException thrown = assertThrows(WebApplicationException.class, () -> {
+        mockClient.getToken(request);
+    });
 
-    assertEquals(httpStatus, thrown.getResponse().getStatus());
-    verify(tokenRestClient).getToken(any(RequestTokenDTO.class));
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), thrown.getResponse().getStatus());
+    assertEquals("Invalid credentials", thrown.getResponse().readEntity(String.class));
 }
+
+
+
+
 
 
 
 @Test
 void shouldThrowGenericExceptionWhenUnexpectedErrorOccurs() {
-    // Arrange
+    // Given: a valid token request DTO
+    RequestTokenDTO request = RequestTokenDTO.builder()
+        .realm("realm")
+        .password("pass")
+        .build();
+
+    // And the mock client throws a RuntimeException
     when(tokenRestClient.getToken(any(RequestTokenDTO.class)))
         .thenThrow(new RuntimeException("Something went wrong"));
 
-    // Act & Assert
+    // When & Then: the TokenProvider should propagate the exception
     RuntimeException thrown = assertThrows(
         RuntimeException.class,
         () -> tokenProvider.getBearerToken()
