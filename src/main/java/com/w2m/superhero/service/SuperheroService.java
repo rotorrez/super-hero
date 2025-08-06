@@ -1,86 +1,58 @@
-import com.santander.san.audobs.sanaudobsbamoecoexislib.adapter.AccessPointAdapter;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventPayloadDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.AppianEventResponseDTO;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.integration.client.AppianRestClient;
-import com.santander.san.audobs.sanaudobsbamoecoexislib.service.AppianEventService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class AppianEventServiceTest {
 
-    @Mock
-    AppianRestClient appianRestClient;
-
-    @Mock
-    AccessPointAdapter accessPointAdapter;
-
     @InjectMocks
-    AppianEventService appianEventService;
+    AppianEventService service;
 
-    private static final String CASE_NUMBER = "123456";
-    private static final String EVENT = "startProcess";
-    private static final String SESSION_ID = "abc123";
-    private static final String CLIENT_ID = "client001";
-    private static final String CHANNEL = "channelX";
+    @Mock
+    AppianRestClient restClient;
 
-    private AppianEventPayloadDTO payload;
-    private AppianEventResponseDTO expectedResponse;
+    @Mock
+    @ConfigProperty(name = "appian-api.client-id")
+    String clientId = "dummy-client-id";
 
-    @BeforeEach
-    void setup() {
-        payload = AppianEventPayloadDTO.builder()
-                .caseNumber(CASE_NUMBER)
-                .event(EVENT)
-                .sessionId(SESSION_ID)
-                .clientId(CLIENT_ID)
-                .channel(CHANNEL)
-                .build();
+    @Mock
+    @ConfigProperty(name = "appian-api.channel")
+    String channel = "dummy-channel";
 
-        expectedResponse = AppianEventResponseDTO.builder()
-                .result("OK")
-                .build();
-    }
+    @Mock
+    TokenProvider tokenProvider;
 
     @Test
-    void triggerEvent_shouldInvokeClientWithCorrectParams() {
+    void testTriggerEvent_Successful() {
         // Arrange
-        when(appianRestClient.triggerEvent(
-                eq(CASE_NUMBER),
-                eq(EVENT),
-                any(AppianEventPayloadDTO.class),
-                eq(SESSION_ID),
-                eq(CLIENT_ID),
-                eq(CHANNEL)
+        String caseNumber = "123";
+        String event = "start";
+        String bearerToken = "Bearer abc";
+
+        AppianEventPayloadDTO payload = AppianEventPayloadDTO.builder()
+            .processCode("PROC-01")
+            .customersIdentification(List.of("CUST-01"))
+            .contactPoint(new AppianContactPointDTO())
+            .specificInformation(null)
+            .build();
+
+        AppianEventResponseDTO expectedResponse = AppianEventResponseDTO.builder()
+            .status("OK")
+            .message("Event triggered")
+            .build();
+
+        when(tokenProvider.getBearerToken()).thenReturn(bearerToken);
+        when(restClient.triggerEvent(
+                eq(caseNumber),
+                eq(event),
+                eq(payload),
+                eq("Bearer abc"),
+                eq(clientId),
+                eq(channel)
         )).thenReturn(expectedResponse);
 
         // Act
-        AppianEventResponseDTO actual = appianEventService.triggerEvent(payload);
+        AppianEventResponseDTO result = service.triggerEvent(caseNumber, event, payload);
 
         // Assert
-        assertNotNull(actual);
-        assertEquals("OK", actual.getResult());
-
-        ArgumentCaptor<AppianEventPayloadDTO> payloadCaptor = ArgumentCaptor.forClass(AppianEventPayloadDTO.class);
-        verify(appianRestClient, times(1)).triggerEvent(
-                eq(CASE_NUMBER),
-                eq(EVENT),
-                payloadCaptor.capture(),
-                eq(SESSION_ID),
-                eq(CLIENT_ID),
-                eq(CHANNEL)
-        );
-
-        AppianEventPayloadDTO sentPayload = payloadCaptor.getValue();
-        assertEquals(CASE_NUMBER, sentPayload.getCaseNumber());
-        assertEquals(EVENT, sentPayload.getEvent());
+        assertNotNull(result);
+        assertEquals("OK", result.getStatus());
+        assertEquals("Event triggered", result.getMessage());
     }
 }
