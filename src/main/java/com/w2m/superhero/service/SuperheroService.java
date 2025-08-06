@@ -50,4 +50,8 @@ class AppianEventServiceTest {
         AppianEventResponseDTO result = service.triggerEvent(request);
 
         // Assert
-        assertNotNull(result
+        assertNotNull(result);
+        assertEquals("OK", result.getStatus());
+        assertEquals("Event triggered successfully", result.getMessage());
+    }
+}
