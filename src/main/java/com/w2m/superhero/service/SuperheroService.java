@@ -1,13 +1,42 @@
-catch (WebApplicationException e) {
-    int status = e.getResponse().getStatus();
-    String errorBody = e.getResponse().readEntity(String.class);
-    Log.errorf("Failed to retrieve configuration for process='%s', config='%s'. HTTP %d - %s",
-            processId, configurationId, status, errorBody);
-    throw new RuntimeException("Failed to retrieve configuration from remote service", e);
+@Test
+void shouldThrowWebApplicationExceptionWhenCallFails() {
+    // Arrange
+    String errorBody = "Unauthorized";
+    int httpStatus = 401;
+
+    Response mockResponse = mock(Response.class);
+    when(mockResponse.getStatus()).thenReturn(httpStatus);
+    when(mockResponse.readEntity(String.class)).thenReturn(errorBody);
+
+    WebApplicationException exception = new WebApplicationException(mockResponse);
+
+    when(tokenRestClient.getToken(any(RequestTokenDTO.class)))
+        .thenThrow(exception);
+
+    // Act & Assert
+    WebApplicationException thrown = assertThrows(
+        WebApplicationException.class,
+        () -> tokenProvider.getBearerToken()
+    );
+
+    assertEquals(httpStatus, thrown.getResponse().getStatus());
+    verify(tokenRestClient).getToken(any(RequestTokenDTO.class));
 }
 
-catch (Exception e) {
-    Log.errorf("Unexpected error while retrieving configuration for process='%s', config='%s': %s",
-            processId, configurationId, e.getMessage());
-    throw new RuntimeException("Unexpected error while retrieving configuration", e);
+
+
+@Test
+void shouldThrowGenericExceptionWhenUnexpectedErrorOccurs() {
+    // Arrange
+    when(tokenRestClient.getToken(any(RequestTokenDTO.class)))
+        .thenThrow(new RuntimeException("Something went wrong"));
+
+    // Act & Assert
+    RuntimeException thrown = assertThrows(
+        RuntimeException.class,
+        () -> tokenProvider.getBearerToken()
+    );
+
+    assertEquals("Something went wrong", thrown.getMessage());
+    verify(tokenRestClient).getToken(any(RequestTokenDTO.class));
 }
