@@ -1,3 +1,4 @@
-mvn clean
-rm -rf target
-rm -rf ~/.m2/repository/io/quarkus
+# En PowerShell
+Remove-Item -Recurse -Force target
+Remove-Item -Recurse -Force "$env:USERPROFILE\.m2\repository\io\quarkus"
+mvn clean install -U
