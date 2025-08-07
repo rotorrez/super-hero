@@ -1,18 +1,1 @@
-<dependency>
-  <groupId>io.quarkus</groupId>
-  <artifactId>quarkus-smallrye-openapi</artifactId>
-  <exclusions>
-    <exclusion>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-resteasy</artifactId>
-    </exclusion>
-    <exclusion>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-resteasy-jackson</artifactId>
-    </exclusion>
-    <exclusion>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-resteasy-common</artifactId>
-    </exclusion>
-  </exclusions>
-</dependency>
+find . -name "*.jar" -exec sh -c 'jar tf {} | grep -q QuarkusRestPathTemplate && echo {}' \;
