@@ -11,5 +11,20 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-resteasy-jackson</artifactId>
     </exclusion>
+    <!-- Agrega esto también -->
+    <exclusion>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-resteasy-server-common</artifactId>
+    </exclusion>
   </exclusions>
+</dependency>
+
+
+  <dependency>
+  <groupId>io.quarkus</groupId>
+  <artifactId>quarkus-rest</artifactId>
+</dependency>
+<dependency>
+  <groupId>io.quarkus</groupId>
+  <artifactId>quarkus-rest-jackson</artifactId>
 </dependency>
