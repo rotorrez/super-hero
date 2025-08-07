@@ -1,4 +1,6 @@
-# En PowerShell
-Remove-Item -Recurse -Force target
-Remove-Item -Recurse -Force "$env:USERPROFILE\.m2\repository\io\quarkus"
-mvn clean install -U
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-resteasy</artifactId>
+    <version>${quarkus.platform.version}</version>
+    <scope>provided</scope> <!-- O test -->
+</dependency>
