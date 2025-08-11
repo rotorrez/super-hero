@@ -5,6 +5,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.*;
 
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 @Builder
@@ -12,11 +13,10 @@ import java.io.Serializable;
 @AllArgsConstructor
 @RegisterForReflection
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class NextTaskInfo implements Serializable {
+public class StartFastProcessResponse implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private String caseIdentifier;
-    private String taskCode;
-    private String taskDescription;
-    private String url;
+    private String status;                 // e.g. "OK"
+    private String message;                // e.g. "Satisfactory execution."
+    private List<NextTaskInfo> tasks;      // puede venir vacío []
 }
