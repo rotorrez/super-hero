@@ -5,7 +5,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.*;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -13,13 +13,12 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @RegisterForReflection
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class AvalDTO implements Serializable {
+public class SpecificInformationDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    /** Recommended as number to avoid thousands separators. */
-    private BigDecimal amount;
-    private String channel;
-    private String city;
-    private String reason;
-    private String release1; // confirmar nombre exacto
+    /** Use String si a veces llega numérico y a veces alfanumérico. */
+    private String idMongo;
+
+    /** Alternativa: payload con avales. */
+    private List<AvalDTO> avales;
 }
