@@ -5,7 +5,6 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.*;
 
 import java.io.Serializable;
-import java.util.List;
 
 @Data
 @Builder
@@ -13,12 +12,9 @@ import java.util.List;
 @AllArgsConstructor
 @RegisterForReflection
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class SpecificInformationDTO implements Serializable {
+public class AndgoUserDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    /** Use String si a veces llega numérico y a veces alfanumérico. */
-    private String idMongo;
-
-    /** Alternativa: payload con avales. */
-    private List<AvalDTO> avales;
+    private String userUid;
+    private String branchCode;
 }
