@@ -1,26 +1,22 @@
-<dependencyManagement>
-  <dependencies>
-    <!-- BOM de Quarkus -->
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-bom</artifactId>
-      <version>${quarkus.platform.version}</version>
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
+package com.santander.san.audobs.sanaudobsbamoecoexislib.dto.andgo;
 
-    <!-- Excluir resteasy desde cualquier sitio -->
-    <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-resteasy</artifactId>
-      <version>${quarkus.platform.version}</version>
-      <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>*</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-  </dependencies>
-</dependencyManagement>
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.quarkus.runtime.annotations.RegisterForReflection;
+import lombok.*;
+
+import java.io.Serializable;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@RegisterForReflection
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class NextTaskInfo implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private String caseIdentifier;
+    private String taskCode;
+    private String taskDescription;
+    private String url;
+}
