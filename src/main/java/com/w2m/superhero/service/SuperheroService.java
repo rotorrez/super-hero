@@ -5,6 +5,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.*;
 
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 @Builder
@@ -12,11 +13,16 @@ import java.io.Serializable;
 @AllArgsConstructor
 @RegisterForReflection
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class AndgoContactPointDTO implements Serializable {
+public class StartFastProcessRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private String userType;         // e.g. "GOFT", "GCOE"
-    private String operativeSystem;  // e.g. "WIN"
-    private String device;           // e.g. "PC"
-    private String codeApp;          // e.g. "50080398"
+    private AndgoContactPointDTO contactPoint;
+    private List<String> customersIdentification;
+    private AndgoUserDTO user;
+
+    private String companyCode;
+    private String creationBranchCode;
+    private String externalReference;
+
+    private SpecificInformationDTO specificInformation;
 }
