@@ -1,28 +1,23 @@
-package com.santander.san.audobs.sanaudobsbamoecoexislib.dto.andgo;
+package com.santander.san.audobs.sanaudobsbamoecoexislib.integration.andgo.rest;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import io.quarkus.runtime.annotations.RegisterForReflection;
-import lombok.*;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.andgo.StartFastProcessRequestDTO;
+import com.santander.san.audobs.sanaudobsbamoecoexislib.dto.andgo.StartFastProcessResponseDTO;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
-import java.io.Serializable;
-import java.util.List;
+@RegisterRestClient(configKey = "appian-andgo-client")
+@Path("/v1/fast-processes")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public interface AppianAndgoRestClient {
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@RegisterForReflection
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class StartFastProcessRequest implements Serializable {
-    private static final long serialVersionUID = 1L;
-
-    private AndgoContactPointDTO contactPoint;
-    private List<String> customersIdentification;
-    private AndgoUserDTO user;
-
-    private String companyCode;
-    private String creationBranchCode;
-    private String externalReference;
-
-    private SpecificInformationDTO specificInformation;
+    @POST
+    @Path("/{processCode}/cases")
+    StartFastProcessResponseDTO startFastProcess(
+        @HeaderParam("Authorization") String authorization, // "Bearer xxx"
+        @HeaderParam("x-ClientId") String clientId,         // exacta grafía del header
+        @PathParam("processCode") String processCode,
+        StartFastProcessRequestDTO request
+    );
 }
