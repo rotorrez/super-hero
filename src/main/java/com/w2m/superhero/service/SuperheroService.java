@@ -1,18 +1,15 @@
-# Dentro del JAR de la librería
-quarkus.rest-client.appian-case-and-go-client.url=${bamoecoexis.appian-case-and-go.base-url:https://default.invalid}
+import org.jboss.resteasy.annotations.jaxrs.PATCH;
 
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public interface AppianCaseAndGoRestClient {
 
-
-@RegisterRestClient(
-    configKey = "appian-case-and-go-client",
-    baseUri   = "https://default.invalid" // Fallback si no hay config
-)
-
-
- @ConfigProperty(name = "bamoecoexis.appian-case-and-go.client-id")
-    Optional<String> clientId;
-
-        String resolvedClientId = clientId.orElseThrow(() -> {
-            Log.error("Client ID is not configured. Set 'bamoecoexis.appian-case-and-go.client-id' in the consumer.");
-            return new RuntimeException("Client ID is not configured");
-        });
+    @PATCH
+    @Path("/{dynamicPart}/start-fast-process")
+    StartFastProcessResponseDTO startFastProcess(
+        @HeaderParam("Authorization") String bearer,
+        @HeaderParam("X-ClientId") String clientId,
+        StartFastProcessRequestDTO body,
+        @PathParam("dynamicPart") String dynamicPath
+    );
+}
