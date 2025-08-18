@@ -1,37 +1,66 @@
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.mockito.InjectMock;
-import jakarta.inject.Inject;
+import java.net.URI;
+
+import org.eclipse.microprofile.rest.client.RestClientBuilder;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@QuarkusTest
-class CardProcessServiceImplTest {
+// Ajusta estos imports a tus paquetes reales
+// import es.tu.paquete.CardProcessServiceImpl;
+// import es.tu.paquete.CardRestClient;
+// import es.tu.paquete.TokenProvider;
+// import es.tu.paquete.CoexistenceService;
+// import es.tu.paquete.dto.CaseRelationDTO;
 
-    @Inject
-    CardProcessServiceImpl service;
+@ExtendWith(MockitoExtension.class)
+class CardProcessServiceImplUnitTest {
 
-    @InjectMock
-    CardRestClient cardRestClient;
+    @Mock TokenProvider tokenProvider;
+    @Mock CoexistenceService coexistenceService;
+    @Mock CardRestClient cardRestClient;
+
+    // Si el constructor del service no existe, Mockito injectará por field.
+    @InjectMocks CardProcessServiceImpl service;
 
     @Test
-    void testCallAbandonCase() {
-        // given
+    void callAbandonCase_returnsOk_whenClientSucceeds() throws Exception {
+        // Arrange
         String caseId = "100";
-        String endpoint = "http://localhost/cancel/#idcaso#";
-        String expectedResponse = "OK";
+        String endpoint = "http://host/cancel/#idcaso#";
 
-        // Mock del cliente REST
-        when(cardRestClient.callAbandonCase(anyString(), anyString(), anyString()))
-                .thenReturn("OK");
+        // Stub de dependencias usadas dentro del método
+        CaseRelationDTO relation = mock(CaseRelationDTO.class);
+        when(relation.getFictionalCaseId()).thenReturn("ABC-123");
+        when(coexistenceService.getCaseRelationByPpaasCaseId(anyString()))
+                .thenReturn(relation);
 
-        // when
-        String result = service.callAbandonCase(caseId, endpoint);
+        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
 
-        // then
-        assertEquals(expectedResponse, result);
-        verify(cardRestClient, times(1))
-                .callAbandonCase(anyString(), anyString(), anyString());
+        // Mockear RestClientBuilder.newBuilder() -> builder -> build(CardRestClient.class)
+        try (MockedStatic<RestClientBuilder> staticMock = mockStatic(RestClientBuilder.class)) {
+            RestClientBuilder builder = mock(RestClientBuilder.class);
+
+            staticMock.when(RestClientBuilder::newBuilder).thenReturn(builder);
+            when(builder.baseUri(any(URI.class))).thenReturn(builder);
+            when(builder.build(CardRestClient.class)).thenReturn(cardRestClient);
+
+            when(cardRestClient.callAbandonCase(anyString(), anyString(), anyString()))
+                    .thenReturn("OK");
+
+            // Act
+            String result = service.callAbandonCase(caseId, endpoint);
+
+            // Assert
+            assertEquals("OK", result);
+            verify(cardRestClient, times(1))
+                    .callAbandonCase(anyString(), anyString(), anyString());
+        }
     }
 }
