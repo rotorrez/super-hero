@@ -1,66 +1,49 @@
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+En IntelliJ, basta con marcar una carpeta como Test Sources Root y él sabe qué es código de test.
+En Visual Studio Code (VS Code) el manejo es diferente porque no tiene esa opción gráfica, depende de la configuración y de la extensión de Java que uses.
 
-import java.net.URI;
+Pasos para ejecutar tests en VS Code
 
-import org.eclipse.microprofile.rest.client.RestClientBuilder;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
+Extensiones necesarias
 
-// Ajusta estos imports a tus paquetes reales
-// import es.tu.paquete.CardProcessServiceImpl;
-// import es.tu.paquete.CardRestClient;
-// import es.tu.paquete.TokenProvider;
-// import es.tu.paquete.CoexistenceService;
-// import es.tu.paquete.dto.CaseRelationDTO;
+Instala las extensiones oficiales de Java:
 
-@ExtendWith(MockitoExtension.class)
-class CardProcessServiceImplUnitTest {
+Extension Pack for Java
 
-    @Mock TokenProvider tokenProvider;
-    @Mock CoexistenceService coexistenceService;
-    @Mock CardRestClient cardRestClient;
+Dentro de este pack está Test Runner for Java (fundamental para ejecutar tests JUnit).
 
-    // Si el constructor del service no existe, Mockito injectará por field.
-    @InjectMocks CardProcessServiceImpl service;
+Estructura de carpetas esperada (Maven/Gradle)
 
-    @Test
-    void callAbandonCase_returnsOk_whenClientSucceeds() throws Exception {
-        // Arrange
-        String caseId = "100";
-        String endpoint = "http://host/cancel/#idcaso#";
+Si tu proyecto es Maven o Gradle (que parece ser tu caso), VS Code ya reconoce por convención:
 
-        // Stub de dependencias usadas dentro del método
-        CaseRelationDTO relation = mock(CaseRelationDTO.class);
-        when(relation.getFictionalCaseId()).thenReturn("ABC-123");
-        when(coexistenceService.getCaseRelationByPpaasCaseId(anyString()))
-                .thenReturn(relation);
+src/main/java      → código principal
+src/test/java      → código de test
 
-        when(tokenProvider.getBearerToken()).thenReturn("mock-token");
 
-        // Mockear RestClientBuilder.newBuilder() -> builder -> build(CardRestClient.class)
-        try (MockedStatic<RestClientBuilder> staticMock = mockStatic(RestClientBuilder.class)) {
-            RestClientBuilder builder = mock(RestClientBuilder.class);
+No necesitas marcar manualmente las carpetas como en IntelliJ.
 
-            staticMock.when(RestClientBuilder::newBuilder).thenReturn(builder);
-            when(builder.baseUri(any(URI.class))).thenReturn(builder);
-            when(builder.build(CardRestClient.class)).thenReturn(cardRestClient);
+VS Code detecta automáticamente que src/test/java contiene tests.
 
-            when(cardRestClient.callAbandonCase(anyString(), anyString(), anyString()))
-                    .thenReturn("OK");
+Cómo ejecutar
 
-            // Act
-            String result = service.callAbandonCase(caseId, endpoint);
+Abre tu clase de test en VS Code (ej: CardProcessServiceImplUnitTest.java).
 
-            // Assert
-            assertEquals("OK", result);
-            verify(cardRestClient, times(1))
-                    .callAbandonCase(anyString(), anyString(), anyString());
-        }
-    }
-}
+Encima de cada método anotado con @Test, VS Code muestra un botón verde ▶ para Run Test o Debug Test.
+
+También puedes hacer clic derecho en el nombre de la clase de test → Run Tests in Current File.
+
+O desde la vista lateral “Testing” (icono del beaker 🧪) → aparecen todos los tests detectados, ahí puedes ejecutarlos en bloque.
+
+Ejecución por línea de comandos (alternativa)
+
+Si quieres ejecutar desde terminal (independiente de VS Code):
+
+./mvnw test        # si usas Maven Wrapper
+mvn test           # si usas Maven
+./gradlew test     # si usas Gradle Wrapper
+gradle test        # si usas Gradle
+
+
+✅ Resumen:
+En VS Code no marcas carpetas como en IntelliJ.
+Si tienes src/test/java, las extensiones de Java lo reconocen automáticamente como carpeta de tests.
+Después puedes lanzar tus @Test desde los botones verdes, desde la vista “Testing” o con Maven/Gradle en terminal.
