@@ -1,2 +1,2 @@
-quarkus.log.category."org.jbpm.workflow.instance.node".level=DEBUG
-quarkus.log.category."org.kie.kogito".level=DEBUG
+var previous = specificDataTask.getPrevious();
+return previous != null && previous.toString().equals("S");
