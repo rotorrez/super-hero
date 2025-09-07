@@ -1,2 +1,5 @@
-var previous = specificDataTask.getPrevious();
-return previous != null && previous.toString().equals("S");
+quarkus:
+  log:
+    category:
+      "com.santander.san.audobs.sanaudobsbamoeeeplib.service":
+        level: DEBUG
