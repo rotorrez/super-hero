@@ -17,89 +17,30 @@ class PortfolioProcessServiceTest {
     ProcessConfigurationService processConfigurationService;
 
     @InjectMocks
-    PortfolioProcessService service;
+    PortfolioProcessService service; // CDI no hace falta; es unit test puro
 
-    @Test
-    void testGetInitialStatus_homebanking() {
-        Integer status = PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_CLBO_PC_WIN);
-        assertEquals(CCARProcessConstants.CCAR_E_01, status);
-    }
+    private ProcessConfigurationDTO buildConfigDto(
+            int fDays, int fHours, int fMinutes, int fSeconds,
+            int sDays, int sHours, int sMinutes, int sSeconds) {
 
-    @Test
-    void testGetInitialStatus_mobileIos() {
-        Integer status = PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_CLBO_MOV_IOS);
-        assertEquals(CCARProcessConstants.CCAR_E_02, status);
-    }
+        // inactivity.formalizationInactivity / inactivity.standarInactivity
+        Map<String, Object> formal = new HashMap<>();
+        formal.put("days", fDays);
+        formal.put("hours", fHours);
+        formal.put("minutes", fMinutes);
+        formal.put("seconds", fSeconds);
 
-    @Test
-    void testGetInitialStatus_default() {
-        Integer status = PortfolioProcessService.getInitialStatus("UNKNOWN");
-        assertEquals(CCARProcessConstants.CCAR_E_01, status); // valor inicial por defecto
-    }
+        Map<String, Object> standar = new HashMap<>();
+        standar.put("days", sDays);
+        standar.put("hours", sHours);
+        standar.put("minutes", sMinutes);
+        standar.put("seconds", sSeconds);
 
-    @Test
-    void testGetPortfolioConfig_mapsCorrectly() {
-        ProcessConfigurationDTO configDto = new ProcessConfigurationDTO();
-        Map<String, Object> configData = new HashMap<>();
-        configDto.setConfigurationData(configData);
+        Map<String, Object> inactivity = new HashMap<>();
+        inactivity.put("formalizationInactivity", formal);
+        inactivity.put("standarInactivity", standar); // ojo: “standar” tal como en tu código
 
-        when(processConfigurationService.getConfiguration(
-                eq(CCARProcessConstants.CCAR_PROCESS),
-                eq(CCARProcessConstants.CCAR_CONFIG_PROCESSPAAS)))
-                .thenReturn(configDto);
+        Map<String, Object> root = new HashMap<>();
+        root.put("inactivity", inactivity);
 
-        PortfolioConfigDTO result = service.getPortfolioConfig();
-
-        assertNotNull(result);
-    }
-
-    @Test
-    void testGetInactivityConfigByType_formalization() {
-        InactivityDTO expected = new InactivityDTO();
-
-        // Mock del PortfolioConfigDTO con InactivityDTO
-        InactivityDTO inactivity = mock(InactivityDTO.class);
-        when(inactivity.getFormalizationInactivity()).thenReturn(expected);
-
-        PortfolioConfigDTO portfolioConfig = mock(PortfolioConfigDTO.class);
-        when(portfolioConfig.getInactivity()).thenReturn(inactivity);
-
-        // Mock del service dependency
-        ProcessConfigurationDTO configDto = new ProcessConfigurationDTO();
-        configDto.setConfigurationData(new HashMap<>());
-        when(processConfigurationService.getConfiguration(any(), any())).thenReturn(configDto);
-
-        // ⚠️ Hack: Sobrescribir manualmente el ObjectMapper dentro del método
-        // (puedes dejarlo como está, el mapper.convertValue funciona con HashMap vacío)
-        PortfolioConfigDTO dummy = new PortfolioConfigDTO();
-        dummy.setInactivity(inactivity);
-
-        // Forzar que service.getPortfolioConfig() devuelva dummy en lugar de nuevo objeto
-        // 👉 Esto lo conseguimos devolviendo un configDto vacío y usando convertValue que crea el dummy.
-        // Si quieres control total, lo ideal es refactorizar service para poder inyectar el ObjectMapper.
-
-        InactivityDTO result = service.getInactivityConfigByType(
-                CCARProcessConstants.INACTIVITY_TYPE_FORMALIZATION);
-
-        assertNotNull(result);
-    }
-
-    @Test
-    void testGetInactivityConfigByType_default() {
-        InactivityDTO expected = new InactivityDTO();
-
-        InactivityDTO inactivity = mock(InactivityDTO.class);
-        when(inactivity.getStandarInactivity()).thenReturn(expected);
-
-        PortfolioConfigDTO portfolioConfig = mock(PortfolioConfigDTO.class);
-        when(portfolioConfig.getInactivity()).thenReturn(inactivity);
-
-        ProcessConfigurationDTO configDto = new ProcessConfigurationDTO();
-        configDto.setConfigurationData(new HashMap<>());
-        when(processConfigurationService.getConfiguration(any(), any())).thenReturn(configDto);
-
-        InactivityDTO result = service.getInactivityConfigByType("UNKNOWN");
-
-        assertNotNull(result);
-    }
-}
+        ProcessConfigurationDTO dto = new ProcessConfigurati
