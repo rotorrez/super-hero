@@ -1,85 +1,49 @@
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-// Ajusta el import de CustomerCase a tu paquete real
-import com.santander.sgt.apm1953.sgtapm1953ppcasedm.model.paas.main.CustomerCase;
+import java.util.HashMap;
+import java.util.Map;
 
-class FormatterUtilsTest {
+@ExtendWith(MockitoExtension.class)
+class PortfolioProcessServiceTest {
 
-    @Test
-    void testSetActorIdList_emptyApplicants_returnsUserId() {
-        List<CustomerCase> applicants = new ArrayList<>();
-        String userId = "U1";
+    @Mock
+    ProcessConfigurationService processConfigurationService;
 
-        String result = FormatterUtils.setActorIdList(applicants, userId);
+    @InjectMocks
+    PortfolioProcessService service;
 
-        assertEquals("U1", result);
+    private ProcessConfigurationDTO configDto;
+
+    @BeforeEach
+    void setup() {
+        configDto = new ProcessConfigurationDTO();
+        Map<String, Object> configData = new HashMap<>();
+        // puedes añadir datos falsos si quieres testear el mapeo
+        configDto.setConfigurationData(configData);
     }
 
     @Test
-    void testSetActorIdList_firstApplicantFillsActorIdList() {
-        List<CustomerCase> applicants = new ArrayList<>();
-        CustomerCase applicant = new CustomerCase();
-        applicant.setCustomerId("A1");
-        applicants.add(applicant);
-
-        String result = FormatterUtils.setActorIdList(applicants, "U1");
-
-        // Como estaba vacío, el primero entra directo
-        assertEquals("A1", result);
+    void testGetInitialStatus_homebanking() {
+        Integer status = PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_CLBO_PC_WIN);
+        assertEquals(CCARProcessConstants.CCAR_E_01, status);
     }
 
     @Test
-    void testSetActorIdList_skipUserId() {
-        List<CustomerCase> applicants = new ArrayList<>();
-        CustomerCase a1 = new CustomerCase();
-        a1.setCustomerId("U1"); // mismo que userId -> se debe saltar
-        CustomerCase a2 = new CustomerCase();
-        a2.setCustomerId("A2");
-
-        applicants.add(a1);
-        applicants.add(a2);
-
-        String result = FormatterUtils.setActorIdList(applicants, "U1");
-
-        // Se ignora U1, se concatena solo A2
-        assertEquals("U1,A2", result);
+    void testGetInitialStatus_mobileIos() {
+        Integer status = PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_CLBO_MOV_IOS);
+        assertEquals(CCARProcessConstants.CCAR_E_02, status);
     }
 
     @Test
-    void testSetActorIdList_multipleApplicants() {
-        List<CustomerCase> applicants = new ArrayList<>();
-        CustomerCase a1 = new CustomerCase();
-        a1.setCustomerId("A1");
-        CustomerCase a2 = new CustomerCase();
-        a2.setCustomerId("A2");
-        CustomerCase a3 = new CustomerCase();
-        a3.setCustomerId("A3");
-
-        applicants.add(a1);
-        applicants.add(a2);
-        applicants.add(a3);
-
-        String result = FormatterUtils.setActorIdList(applicants, "U1");
-
-        assertEquals("A1,A2,A3", result);
-    }
-
-    @Test
-    void testSetAccessPoint_returnsExpectedConstants() {
-        String taskId = "dummy";
-        String result = FormatterUtils.setAccessPoint(taskId);
-
-        String expected = 
-            CCARProcessConstants.CCAR_GOFI_PC_WIN + "," +
-            CCARProcessConstants.CCAR_CLBO_PC_WIN + "," +
-            CCARProcessConstants.CCAR_CLBO_MOV_IOS + "," +
-            CCARProcessConstants.CCAR_CLBO_MOV_AND; // ajusta según tu clase
-
-        assertEquals(expected, result);
-    }
-}
+    void testGetInitialStatus_default() {
+        Integer status = PortfolioProcessService.getInitialStatus("UNKNOWN");
+        assertEquals(CCARProcessConstants.CCAR_E_01, status);
