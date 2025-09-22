@@ -1,110 +1,80 @@
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+📑 Estructura recomendada para Confluence (versión en español)
+Librería san-audobs-bamoeeeplib
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+Descripción General
+La librería san-audobs-bamoeeeplib ha sido desarrollada para centralizar y reutilizar lógica común en los procesos BAMOE España, evitando duplicidades en los distintos microservicios. Incluye servicios para la gestión de inactividad, configuración de procesos, tratamiento de eventos y utilidades de formato de fecha.
 
-import java.util.HashMap;
-import java.util.Map;
+Esta librería es consumida por aplicaciones Java con Quarkus, y proporciona módulos listos para integrarse en flujos de negocio orquestados en BAMOE.
 
-@ExtendWith(MockitoExtension.class)
-class PortfolioProcessServiceTest {
+Configuración
+Los consumidores deben incluir la siguiente configuración en su application.yml:
 
-    @Mock
-    ProcessConfigurationService processConfigurationService;
+tokenprovider:
+  uid: aplapp
+  password: prueba
+  realm: SantanderBCE
+  url: https://srvnuarintra.santander.dev.corp/sas/authenticate/credentials
 
-    @InjectMocks
-    PortfolioProcessService service; // CDI no hace falta; es unit test puro
+processconfig:
+  base-url: https://saneepp.santander.dev.corp/api/v1/processes_data
+  client-id: cespla
 
-    private ProcessConfigurationDTO buildConfigDto(
-            int fDays, int fHours, int fMinutes, int fSeconds,
-            int sDays, int sHours, int sMinutes, int sSeconds) {
 
-        // inactivity.formalizationInactivity / inactivity.standarInactivity
-        Map<String, Object> formal = new HashMap<>();
-        formal.put("days", fDays);
-        formal.put("hours", fHours);
-        formal.put("minutes", fMinutes);
-        formal.put("seconds", fSeconds);
+Módulos incluidos
 
-        Map<String, Object> standar = new HashMap<>();
-        standar.put("days", sDays);
-        standar.put("hours", sHours);
-        standar.put("minutes", sMinutes);
-        standar.put("seconds", sSeconds);
+InactivityService
+Proporciona lógica de negocio para determinar si un caso está inactivo según umbrales de tiempo y la última fecha de actualización.
+Incluye cálculo de fecha de expiración futura según configuración de inactividad.
 
-        Map<String, Object> inactivity = new HashMap<>();
-        inactivity.put("formalizationInactivity", formal);
-        inactivity.put("standarInactivity", standar); // ojo: “standar” tal como en tu código
+DateFormatUtils
+Clase utilitaria para generar periodos en formato ISO-8601.
+Uso frecuente en reglas de BAMOE o plazos de vencimiento.
 
-        Map<String, Object> root = new HashMap<>();
-        root.put("inactivity", inactivity);
+EventMapperUtils
+Clase estática para mapear eventos genéricos (Map<String, Object>) a objetos EventDTO.
 
-        ProcessConfigurationDTO dto = new ProcessConfigurationDTO();
-        dto.setConfigurationData(root);
-        return dto;
-    }
+ProcessConfiguration
+Permite recuperar de forma segura la configuración de procesos desde una API remota.
+Ejemplo de uso:
 
-    @Test
-    void getInactivityConfigByType_returnsFormalization_whenTypeIsFormalization() {
-        // given
-        ProcessConfigurationDTO cfg =
-            buildConfigDto(1, 2, 3, 4,   // formalization
-                           9, 8, 7, 6);  // standar (default)
-        when(processConfigurationService.getConfiguration(
-                eq(CCARProcessConstants.CCAR_PROCESS),
-                eq(CCARProcessConstants.CCAR_CONFIG_PROCESSPAAS)))
-            .thenReturn(cfg);
+@Inject
+ProcessConfigurationService configurationService;
 
-        // when
-        InactivityDTO res =
-            service.getInactivityConfigByType(CCARProcessConstants.INACTIVITY_TYPE_FORMALIZATION);
+ProcessConfigurationDTO configDto = configurationService.getConfiguration("TACR", "TACRPPAAS");
+Map<String, Object> configData = configDto.getConfigurationData();
 
-        // then
-        assertNotNull(res);
-        assertEquals(1, res.getDays());
-        assertEquals(2, res.getHours());
-        assertEquals(3, res.getMinutes());
-        assertEquals(4, res.getSeconds());
-    }
 
-    @Test
-    void getInactivityConfigByType_returnsStandar_whenTypeIsUnknown() {
-        // given
-        ProcessConfigurationDTO cfg =
-            buildConfigDto(1, 2, 3, 4,   // formalization
-                           5, 6, 7, 8);  // standar (default)
-        when(processConfigurationService.getConfiguration(
-                eq(CCARProcessConstants.CCAR_PROCESS),
-                eq(CCARProcessConstants.CCAR_CONFIG_PROCESSPAAS)))
-            .thenReturn(cfg);
+EventService
+Servicio utilitario para actualizar estado y etapa de casos según datos de eventos.
+Ejemplo de método:
 
-        // when
-        InactivityDTO res = service.getInactivityConfigByType("UNKNOWN");
+public void changeStatusOrStageFromSignalEvent(Map<String, Object> eventMap, Integer statusId)
 
-        // then
-        assertNotNull(res);
-        assertEquals(5, res.getDays());
-        assertEquals(6, res.getHours());
-        assertEquals(7, res.getMinutes());
-        assertEquals(8, res.getSeconds());
-    }
 
-    @Test
-    void getInitialStatus_static_cases() {
-        assertEquals(CCARProcessConstants.CCAR_E_01,
-                PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_CLBO_PC_WIN));
-        assertEquals(CCARProcessConstants.CCAR_E_02,
-                PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_CLBO_MOV_IOS));
-        assertEquals(CCARProcessConstants.CCAR_E_02,
-                PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_CLBO_MOV_AND));
-        assertEquals(CCARProcessConstants.CCAR_E_03,
-                PortfolioProcessService.getInitialStatus(CCARProcessConstants.CCAR_GOFI_PC_WIN));
-        // default branch
-        assertEquals(CCARProcessConstants.CCAR_E_01,
-                PortfolioProcessService.getInitialStatus("ANY_OTHER"));
-    }
-}
+Formato de entrada requerido:
+
+Key	Tipo	Descripción
+caseId	String	Identificador interno de caso
+processId	String	Identificador del proceso
+userId	String	Usuario que dispara el evento
+centerId	String	Centro de ejecución
+stageId	String	Etapa asignada
+accessPointId	String	Punto de acceso sobrescrito
+
+Trazabilidad con Jira
+El desarrollo de esta librería está gestionado en el ticket principal de Jira:
+👉 ESPESTPROC-7900 – Librería EEPP BAMOE ESP
+
+Subtareas asociadas:
+
+Creación de componente librería.
+
+Formato de fecha en ISO8601.
+
+Service de inactividad de casos.
+
+Gestión de Token para llamadas a API Process PaaS.
+
+Obtención de configuración de procesos.
+
+Funcionalidad de actualización de estados vía eventos.
