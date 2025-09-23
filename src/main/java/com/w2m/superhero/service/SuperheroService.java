@@ -1,5 +1,4 @@
-Project Status
+Hola equipo,  
+he actualizado el repo: añadí el tag `v1.0-on-hold` y una nota en el README para indicar que el proyecto queda en pausa.  
 
-This project is currently on hold.
-The last stable codebase has been tagged as v1.0-on-hold
-.
+De esta forma, si en algún momento se reactiva, tendremos identificado el último estado estable y la documentación de referencia en Confluence.  
